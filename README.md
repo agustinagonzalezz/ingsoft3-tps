@@ -1,75 +1,62 @@
-# tp-inge3
+# tp-inge3 - TeamPay mini
 
-Mini app de gestión de cuotas y gastos para un equipo de fútbol amateur.
-Base para la serie de TPs de Ingeniería de Software III (CI/CD, testing,
-dockerización, IaC, seguridad). Un solo equipo hardcodeado, sin login,
-sin dependencias externas que requieran API key.
+App de gestion de jugadoras, eventos y pagos de un equipo. Repo del semestre
+para Ingenieria de Software 3 (UCC).
 
-## Stack
+**Stack:** Next.js 16 (App Router) + Prisma 7 (@prisma/adapter-pg) + PostgreSQL.
 
-Next.js (App Router) + TypeScript, Prisma 7 + PostgreSQL, Tailwind CSS,
-Docker Compose para la base local.
+## Arranque con Docker (recomendado)
 
-## Levantar el proyecto desde cero
+Requisitos: Docker y Docker Compose instalados.
 
 ```bash
-# 1. Instalar dependencias
-npm install
+git clone https://github.com/agustinagonzalezz/ingsoft3-tp01.git
+cd ingsoft3-tp01
 
-# 2. Variables de entorno
 cp .env.example .env
+# (opcional) edita .env y pone otra contrasena para la BD local
 
-# 3. Levantar Postgres local
-docker compose up -d
+docker compose up -d --build
+docker compose ps          # espera a ver "postgres" healthy y "app" running
+docker compose logs app    # confirma que "prisma migrate deploy" corrio sin errores
+```
 
-# 4. Aplicar las migraciones (regenera el cliente de Prisma automáticamente)
-npx prisma migrate dev
+La app queda disponible en http://localhost:3000
 
-# 5. Cargar datos de prueba
-npx prisma db seed
+### Probar persistencia
 
-# 6. Arrancar en modo desarrollo
+```bash
+docker compose down && docker compose up -d
+# los datos siguen ahi: el volumen postgres_data sobrevive al down sin -v
+
+docker compose down -v && docker compose up -d
+# ahora si se pierden: -v borra tambien los volumenes
+```
+
+### Levantar desde las imagenes publicadas (sin build local)
+
+```bash
+docker compose -f docker-compose.registry.yml up -d
+```
+
+Baja la imagen ya publicada en ghcr.io/agustinagonzalezz/ingsoft3-tp01:v0.1.0
+en vez de construirla localmente.
+
+## Desarrollo local (sin Docker)
+
+Si preferis correr la app directo en tu maquina (con Postgres dockerizado
+aparte):
+
+```bash
+docker compose up -d postgres   # solo la base, publicada en localhost:5432
+npm install
 npm run dev
 ```
 
-La app queda en [http://localhost:3000](http://localhost:3000) (redirige a `/dashboard`).
+Asegurate de que DATABASE_URL en tu .env apunte a localhost:5432 (no a
+postgres:5432, que solo funciona dentro de la red de Docker).
 
-## Otros comandos
+## Documentacion del TP2 (Dockerizacion)
 
-```bash
-npm run build        # build de producción
-npm start             # levanta el build de producción
-npm run lint           # ESLint
-npx tsc --noEmit       # chequeo de tipos
-
-npx prisma studio          # explorador de datos en localhost:5555
-npx prisma migrate reset   # ⚠️ resetea la base y vuelve a correr el seed
-docker compose down        # baja Postgres
-```
-
-## Pantallas
-
-- `/jugadoras` — alta, edición de nombre y estado activa/inactiva.
-- `/eventos` — alta de eventos (cuota/torneo/amistoso/otro), estado de pago
-  por jugadora y marcado de pagos.
-- `/dashboard` — recaudado, pendiente de cobro, gastos y balance neto.
-
-## Reglas de negocio
-
-Están implementadas como funciones puras en [`src/lib/rules.ts`](src/lib/rules.ts),
-sin Prisma ni Next.js — pensadas para poder testearse con datos planos, sin
-mockear la base:
-
-| Función | Qué hace |
-|---|---|
-| `calcularDeudaJugadora` | Deuda total de una jugadora sumando lo que debe por cada evento en el que participa, con soporte de pagos parciales. |
-| `calcularBalanceEquipo` | Recaudado - gastos del equipo, opcionalmente filtrado por rango de fechas. |
-| `puedeEliminarEvento` | Rechaza el borrado de un evento que ya tiene pagos asociados. |
-| `validarMontoEvento` | Rechaza montos de evento <= 0. |
-| `eximirJugadora` | Exime a una jugadora de un evento puntual (su deuda por ese evento pasa a 0). |
-| `jugadoraInactivaSinDeudaFutura` | Filtra los eventos creados después de que una jugadora se dio de baja, para que no le sigan sumando deuda (conserva su historial de pagos pasados). |
-
-El resto de las capas: `src/lib/db.ts` (singleton de PrismaClient con driver
-adapter), `prisma/schema.prisma` (modelo de datos) y `src/app/**` (páginas y
-Server Actions que llaman directo a `db` y a `rules.ts`, sin capas
-intermedias).
+- decisiones.md: justificacion de la app elegida y decisiones de arquitectura de contenedores.
+- evidencias.md: capturas de todo funcionando de punta a punta.
