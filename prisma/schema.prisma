@@ -1,0 +1,82 @@
+// Schema de tp-inge3 — un solo equipo hardcodeado, sin multi-tenant.
+// Ver README.md para el contexto del TP (DevOps: CI/CD, testing, docker, IaC).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EventType {
+  CUOTA
+  TORNEO
+  AMISTOSO
+  OTRO
+}
+
+enum ExpenseCategory {
+  ENTRENADOR
+  CANCHA
+  ARBITROS
+  INDUMENTARIA
+  OTRO
+}
+
+model Player {
+  id        String    @id @default(cuid())
+  name      String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  // Se completa al pasar `active` a false. La usa la regla de negocio
+  // "jugadoraInactivaSinDeudaFutura" (ver src/lib/rules.ts).
+  deactivatedAt DateTime?
+
+  participations EventParticipant[]
+}
+
+model Event {
+  id        String    @id @default(cuid())
+  name      String
+  type      EventType
+  amount    Decimal   @db.Decimal(10, 2)
+  dueDate   DateTime
+  createdAt DateTime  @default(now())
+
+  participants EventParticipant[]
+}
+
+// Relación Player-Event: permite eximir jugadoras puntuales de un evento
+// y, a futuro, fijar un monto distinto al general del evento (amountOverride).
+model EventParticipant {
+  id             String   @id @default(cuid())
+  playerId       String
+  eventId        String
+  exempt         Boolean  @default(false)
+  amountOverride Decimal? @db.Decimal(10, 2)
+
+  player   Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([playerId, eventId])
+}
+
+model Payment {
+  id                 String   @id @default(cuid())
+  eventParticipantId String
+  amount             Decimal  @db.Decimal(10, 2)
+  paidAt             DateTime @default(now())
+
+  eventParticipant EventParticipant @relation(fields: [eventParticipantId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id       String          @id @default(cuid())
+  concept  String
+  amount   Decimal         @db.Decimal(10, 2)
+  category ExpenseCategory
+  date     DateTime
+}
