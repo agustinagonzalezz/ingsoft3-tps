@@ -16,7 +16,7 @@ services:
       retries: 10
 
   app:
-    image: ghcr.io/agustinagonzalezz/CAMBIAR_NOMBRE:v0.1.0
+    image: ghcr.io/agustinagonzalezz/ingsoft3-tp01:v0.1.0
     environment:
       DATABASE_URL: "postgresql://tpinge3:${DB_PASSWORD}@postgres:5432/tpinge3_db"
     ports:
