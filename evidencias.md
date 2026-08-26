@@ -22,6 +22,7 @@ Muestro los conflictos entre ambas ramas (Ay B)
 
 
 
+
 ## TP2 — Contenedores
 
 Capturas de la app dockerizada funcionando de punta a punta.
@@ -83,3 +84,4 @@ Imagen publicada como pública en GitHub Container Registry, tag `v0.1.0`:
 completo descargando la imagen del registry, sin buildear local.
 
 ![arranque desde registry](evidencias/07-registry-up.png)
+
