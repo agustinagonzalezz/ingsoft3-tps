@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tpinge3
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: tpinge3_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tpinge3"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: "postgresql://tpinge3:${DB_PASSWORD}@postgres:5432/tpinge3_db"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
