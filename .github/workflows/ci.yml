@@ -1,7 +1,31 @@
 name: CI
-on: [pull_request]
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Qué estamos verificando
+        env:
+          RAMA: ${{ github.head_ref || github.ref_name }}
+        run: echo "Rama $RAMA · commit $GITHUB_SHA"
+
+      - name: Bajar el código al runner
+        uses: actions/checkout@v6
+
+      - name: Preparar el constructor que sabe cachear
+        uses: docker/setup-buildx-action@v4
+
+      - name: Construir la imagen de la app
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: ingsoft3-tps:ci
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
