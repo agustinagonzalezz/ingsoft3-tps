@@ -1,3 +1,5 @@
+[![CI](https://github.com/agustinagonzalezz/ingsoft3-tps/actions/workflows/ci.yml/badge.svg)](https://github.com/agustinagonzalezz/ingsoft3-tps/actions/workflows/ci.yml)
+
 # tp-inge3 - TeamPay mini
 
 App de gestion de jugadoras, eventos y pagos de un equipo. Repo del semestre
