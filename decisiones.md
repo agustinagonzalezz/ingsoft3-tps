@@ -125,55 +125,43 @@ en `evidencias.md`. Entiendo por qué cada corrección funciona (lo explico en
 la sección de problemas de arriba) y puedo defenderlo en la mesa: qué hace
 cada etapa del Dockerfile, por qué el CLI necesita su propia etapa, y por qué
 las páginas necesitan `force-dynamic`.
-## TP3 - Planificaci?n y trazabilidad
 
-### Duraci?n del sprint
+## TP3 - Planificación y trazabilidad
 
-Eleg? un sprint de **2 semanas**. Con la cursada organizada en entregas peri?dicas de TPs, un ciclo de 2 semanas da margen suficiente para completar una historia con sus tareas sin que el sprint quede vac?o de contenido (como pasar?a con 1 semana, muy ajustado para el ritmo de la materia), y sin extenderse tanto como para perder el sentido de "iteraci?n corta" que tiene un sprint (como pasar?a con 4 semanas).
+### Duración del sprint
+Elegí un sprint de 2 semanas. Con la cursada organizada en entregas periódicas de TPs, un ciclo de 2 semanas da margen suficiente para completar una historia con sus tareas sin que el sprint quede vacío de contenido (como pasaría con 1 semana, muy ajustado para el ritmo de la materia), y sin extenderse tanto como para perder el sentido de "iteración corta" que tiene un sprint (como pasaría con 4 semanas).
 
-### L?mite de trabajo en progreso (WIP)
+### Límite de trabajo en progreso (WIP)
+Configuré el límite en 2 para la columna "In Progress". La regla de arranque es cantidad de personas + 1; trabajando solo, eso da 1 + 1 = 2. El "+1" es la válvula de escape para cuando algo queda trabado esperando una revisión o una respuesta externa y necesito poder avanzar en otra cosa sin quedarme frenado. Si en la práctica nunca llego a alcanzar el límite, es señal de que está demasiado alto y convendría bajarlo a 1.
 
-Configur? el l?mite en **2** para la columna "In Progress". La regla de arranque es cantidad de personas + 1; trabajando solo, eso da 1 + 1 = 2. El "+1" es la v?lvula de escape para cuando algo queda trabado esperando una revisi?n o una respuesta externa y necesito poder avanzar en otra cosa sin quedarme frenado. Si en la pr?ctica nunca llego a alcanzar el l?mite, es se?al de que est? demasiado alto y convendr?a bajarlo a 1.
+### Diagnóstico de la historia mal escrita
+La historia "Como desarrollador quiero crear la tabla usuarios para guardar los datos" está mal escrita porque es una tarea disfrazada de historia: describe una acción técnica interna (crear una tabla), no un incremento de valor observable por un usuario o rol de negocio. Nadie "quiere" una tabla; el "para" no justifica una prioridad de producto, solo describe un paso de implementación. La reescribiría subiendo un nivel de abstracción, por ejemplo: "Como usuario quiero poder registrarme en la aplicación para acceder con mis propias credenciales" — y "crear la tabla usuarios" pasaría a ser una de las tareas técnicas dentro de esa historia.
 
-### Diagn?stico de la historia mal escrita
+### Problemas encontrados y cómo los resolví
+Al armar la jerarquía, intenté pararme en el repo usando un placeholder de ruta sin reemplazarlo (<tu-repo-de-la-app>), lo que generó un error de ruta inválida en PowerShell. Lo resolví listando el contenido de la carpeta con `dir` hasta encontrar la carpeta real del proyecto, y confirmando que era el repo correcto con `git status` y `git remote -v`.
+Descubrí en el proceso que mi repo local había quedado en una carpeta anidada con el mismo nombre (`ingsoft3-tps/ingsoft3-tps`) y que el remoto había sido renombrado respecto al que usé en TP1/TP2 (`ingsoft3-tp01` → `ingsoft3-tps`). Verifiqué con `git remote -v` y `dir` que el contenido de la app (Dockerfile, decisiones.md, evidencias.md previos) seguía intacto antes de continuar, para no perder trabajo previo.
+Al crear el PR de CI, tuve que confirmar explícitamente que el `Closes #N` apuntara al número de la tarea (#10) y no al de la historia (#9), para no cerrar la historia con trabajo pendiente sin terminar.
 
-La historia "Como desarrollador quiero crear la tabla usuarios para guardar los datos" est? mal escrita porque es una **tarea disfrazada de historia**: describe una acci?n t?cnica interna (crear una tabla), no un incremento de valor observable por un usuario o rol de negocio. Nadie "quiere" una tabla; el "para" no justifica una prioridad de producto, solo describe un paso de implementaci?n. La reescribir?a subiendo un nivel de abstracci?n, por ejemplo: "Como usuario quiero poder registrarme en la aplicaci?n para acceder con mis propias credenciales" ? y "crear la tabla usuarios" pasar?a a ser una de las tareas t?cnicas dentro de esa historia.
-
-### Problemas encontrados y c?mo los resolv?
-
-- Al armar la jerarqu?a, intent? pararme en el repo usando un placeholder de ruta sin reemplazarlo (\<tu-repo-de-la-app>\), lo que gener? un error de ruta inv?lida en PowerShell. Lo resolv? listando el contenido de la carpeta con \dir\ hasta encontrar la carpeta real del proyecto, y confirmando que era el repo correcto con \git status\ y \git remote -v\.
-- Descubr? en el proceso que mi repo local hab?a quedado en una carpeta anidada con el mismo nombre (\ingsoft3-tps\\ingsoft3-tps\) y que el remoto hab?a sido renombrado respecto al que us? en TP1/TP2 (\ingsoft3-tp01\ ? \ingsoft3-tps\). Verifiqu? con \git remote -v\ y \dir\ que el contenido de la app (Dockerfile, decisiones.md, evidencias.md previos) segu?a intacto antes de continuar, para no perder trabajo previo.
-- Al crear el PR de CI, tuve que confirmar expl?citamente que el \Closes #N\ apuntara al n?mero de la **tarea** (#10) y no al de la historia (#9), para no cerrar la historia con trabajo pendiente sin terminar.
-
-### Declaraci?n de uso de IA
-
-Us? Claude (Anthropic) como asistente durante todo el TP3: gu?a paso a paso para crear las etiquetas, la ?pica, la historia, las tareas y el bug v?a \gh issue create\; armado de la jerarqu?a con \gh issue edit --add-sub-issue\; configuraci?n del Project (visibilidad p?blica, vista Board, campo Sprint, l?mite de WIP); y redacci?n del workflow \.github/workflows/ci.yml\ y el PR de trazabilidad. Verifiqu? cada paso ejecutando los comandos yo mismo y revisando la salida real en mi terminal y en GitHub (n?meros de issue, estado de los checks del PR, campo "Parent" y "Projects" del issue cerrado) antes de continuar al siguiente paso.
+### Declaración de uso de IA
+Usé Claude (Anthropic) como asistente durante todo el TP3: guía paso a paso para crear las etiquetas, la épica, la historia, las tareas y el bug vía `gh issue create`; armado de la jerarquía con `gh issue edit --add-sub-issue`; configuración del Project (visibilidad pública, vista Board, campo Sprint, límite de WIP); y redacción del workflow `.github/workflows/ci.yml` y el PR de trazabilidad. Verifiqué cada paso ejecutando los comandos yo mismo y revisando la salida real en mi terminal y en GitHub (números de issue, estado de los checks del PR, campo "Parent" y "Projects" del issue cerrado) antes de continuar al siguiente paso.
 
 ## TP4 - CI: Pipelines as Code
 
 ### Estructura elegida del pipeline
+Mi app tiene un único Dockerfile (Next.js con App Router unifica front y back en un solo proceso, decisión ya justificada en el TP2), así que el pipeline tiene un solo job (`build`) en vez de los dos jobs en paralelo (backend/frontend) que propone la guía para stacks separados. No inventé un segundo job vacío para llegar a un número: el pipeline construye exactamente lo que la app tiene. El trigger es `pull_request` (verifica antes del merge, alimenta el gate) y `push` a `main` (deja la corrida que lee el badge y que además guarda el cache que después reutiliza cualquier PR nuevo).
 
-Mi app tiene un ?nico Dockerfile (Next.js con App Router unifica front y back en un solo proceso, decisi?n ya justificada en el TP2), as? que el pipeline tiene **un solo job** (\uild\) en vez de los dos jobs en paralelo (backend/frontend) que propone la gu?a para stacks separados. No invent? un segundo job vac?o para llegar a un n?mero: el pipeline construye exactamente lo que la app tiene. El trigger es \pull_request\ (verifica antes del merge, alimenta el gate) y \push\ a \main\ (deja la corrida que lee el badge y que adem?s guarda el cache que despu?s reutiliza cualquier PR nuevo).
+### Qué cachea el pipeline
+Se cachean las capas de la imagen Docker vía `docker/setup-buildx-action` + `cache-from`/`cache-to: type=gha`. En la segunda corrida del mismo PR, todas las capas mostraron `CACHED`: la instalación de dependencias (`npm ci`), la generación de Prisma (`npx prisma generate`), el build de Next (`npm run build`) y todas las copias entre etapas del Dockerfile multi-stage. Esto tiene sentido porque entre una corrida y la otra no cambió ningún archivo relevante (usé un commit vacío para dispararla). Si el cache desaparece, el pipeline sigue funcionando igual, solo que reconstruye todo desde cero — no es una dependencia real, es una optimización de velocidad.
 
-### Qu? cachea el pipeline
+### Por qué el pipeline construye con mi Dockerfile en vez de compilar por su cuenta
+Si el workflow corriera `npm run build` directamente en vez de delegarle todo a `docker build`, tendría dos definiciones distintas de cómo se arma la app: la que usa el pipeline para verificar, y la que uso después para desplegar (vía el mismo Dockerfile). Con el tiempo esas dos definiciones divergen y terminaría verificando algo distinto de lo que realmente se despliega. Usando el Dockerfile como única fuente de verdad, lo que el pipeline verifica es exactamente lo que se va a correr en producción.
 
-Se cachean las capas de la imagen Docker v?a \docker/setup-buildx-action\ + \cache-from\/\cache-to: type=gha\. En la segunda corrida del mismo PR, **todas** las capas mostraron \CACHED\: la instalaci?n de dependencias (\
-pm ci\), la generaci?n de Prisma (\
-px prisma generate\), el build de Next (\
-pm run build\) y todas las copias entre etapas del Dockerfile multi-stage. Esto tiene sentido porque entre una corrida y la otra no cambi? ning?n archivo relevante (us? un commit vac?o para dispararla). Si el cache desaparece, el pipeline sigue funcionando igual, solo que reconstruye todo desde cero ? no es una dependencia real, es una optimizaci?n de velocidad.
+### Problemas encontrados y cómo los resolví
+Al configurar el gate por la web (Settings → Branches → Require status checks), el checkbox se guardó pero el campo `contexts` quedó vacío — lo detecté corriendo `gh api .../branches/main/protection --jq '.required_status_checks'` antes de seguir. Lo resolví aplicando la protección completa vía `gh api --method PUT`, re-declarando también lo que ya tenía del TP1 (0 approvals + `enforce_admins: true`) para no perderlo, ya que el PUT reescribe la protección entera en vez de mezclarla.
+Al agregar el badge del README en un PR nuevo, el merge con `main` generó un conflicto porque un PR anterior (el de relleno de la demo del gate) había agregado una línea en blanco al final del mismo archivo. Lo resolví actualizando primero mi `main` local (estaba desactualizado respecto del remoto, por eso `git merge main` no traía nada al principio), y después resolviendo el conflicto a mano en VS Code conservando ambos cambios: el badge arriba y el resto del contenido tal como estaba.
+Verifiqué que el error de "Cannot merge binary files" que mostró Git no era un problema real de codificación (los bytes del archivo eran ASCII/UTF-8 normal) sino un falso positivo del propio Git al intentar el auto-merge; se resolvió igual editando el archivo directamente.
 
-### Por qu? el pipeline construye con mi Dockerfile en vez de compilar por su cuenta
-
-Si el workflow corriera \
-pm run build\ directamente en vez de delegarle todo a \docker build\, tendr?a dos definiciones distintas de c?mo se arma la app: la que usa el pipeline para verificar, y la que uso despu?s para desplegar (v?a el mismo Dockerfile). Con el tiempo esas dos definiciones divergen y terminar?a verificando algo distinto de lo que realmente se despliega. Usando el Dockerfile como ?nica fuente de verdad, lo que el pipeline verifica es exactamente lo que se va a correr en producci?n.
-
-### Problemas encontrados y c?mo los resolv?
-
-- Al configurar el gate por la web (Settings ? Branches ? Require status checks), el checkbox se guard? pero el campo \contexts\ qued? vac?o ? lo detect? corriendo \gh api .../branches/main/protection --jq '.required_status_checks'\ antes de seguir. Lo resolv? aplicando la protecci?n completa v?a \gh api --method PUT\, re-declarando tambi?n lo que ya ten?a del TP1 (0 approvals + \enforce_admins: true\) para no perderlo, ya que el PUT reescribe la protecci?n entera en vez de mezclarla.
-- Al agregar el badge del README en un PR nuevo, el merge con \main\ gener? un conflicto porque un PR anterior (el de relleno de la demo del gate) hab?a agregado una l?nea en blanco al final del mismo archivo. Lo resolv? actualizando primero mi \main\ local (estaba desactualizado respecto del remoto, por eso \git merge main\ no tra?a nada al principio), y despu?s resolviendo el conflicto a mano en VS Code conservando ambos cambios: el badge arriba y el resto del contenido tal como estaba.
-- Verifiqu? que el error de "Cannot merge binary files" que mostr? Git no era un problema real de codificaci?n (los bytes del archivo eran ASCII/UTF-8 normal) sino un falso positivo del propio Git al intentar el auto-merge; se resolvi? igual editando el archivo directamente.
-
-### Declaraci?n de uso de IA
-
-Us? Claude (Anthropic) como asistente durante todo el TP4: adaptaci?n del workflow de dos jobs a uno solo (justificada por mi Dockerfile ?nico), redacci?n del YAML con cache de capas, configuraci?n del gate v?a \gh api\, diagn?stico del conflicto de merge en el README y de la protecci?n de rama mal guardada, y armado de la secuencia de la demo (romper el build ? PR bloqueado ? fix ? verde ? merge). Verifiqu? cada paso ejecutando los comandos yo mismo: revis? el log de cada corrida en la pesta?a Actions (\CACHED\ en las capas, el error real de TypeScript al romper el build), el estado real de la protecci?n de rama con \gh api\, y el resultado final del README y el badge en GitHub antes de dar cada paso por cerrado.
+### Declaración de uso de IA
+Usé Claude (Anthropic) como asistente durante todo el TP4: adaptación del workflow de dos jobs a uno solo (justificada por mi Dockerfile único), redacción del YAML con cache de capas, configuración del gate vía `gh api`, diagnóstico del conflicto de merge en el README y de la protección de rama mal guardada, y armado de la secuencia de la demo (romper el build → PR bloqueado → fix → verde → merge). Verifiqué cada paso ejecutando los comandos yo mismo: revisé el log de cada corrida en la pestaña Actions (`CACHED` en las capas, el error real de TypeScript al romper el build), el estado real de la protección de rama con `gh api`, y el resultado final del README y el badge en GitHub antes de dar cada paso por cerrado.
+el badge en GitHub antes de dar cada paso por cerrado.
 
