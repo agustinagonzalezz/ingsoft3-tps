@@ -1,19 +1,19 @@
 ## TP1 - Git colaborativo
 
-### Por qu? Git no pudo resolver el conflicto solo
+### Por que Git no pudo resolver el conflicto solo
 
-Dos ramas (\eature/titulo-a\ y otra rama en paralelo) modificaron la **misma l?nea** del mismo archivo (\README.md\, la l?nea del t?tulo del proyecto) de forma simult?nea, cada una con un texto distinto. Git resuelve autom?ticamente los cambios que tocan l?neas o archivos distintos, pero cuando dos ramas editan la misma l?nea no tiene forma de decidir cu?l de las dos versiones es la "correcta" ? ambas son ediciones v?lidas del mismo lugar del archivo, y elegir entre ellas es una decisi?n de contenido, no algo que se pueda resolver con un algoritmo de diff. Para que nunca hubiera aparecido el conflicto, alguna de las dos ramas tendr?a que haber hecho \pull\/rebase de \main\ antes de tocar esa l?nea, viendo el cambio de la otra rama antes de proponer el propio.
+Dos ramas (\eature/titulo-a\ y otra rama en paralelo) modificaron la **misma linea** del mismo archivo (\README.md\, la linea del titulo del proyecto) de forma simultanea, cada una con un texto distinto. Git resuelve automaticamente los cambios que tocan lineas o archivos distintos, pero cuando dos ramas editan la misma linea no tiene forma de decidir cual de las dos versiones es la "correcta" ? ambas son ediciones vlaidas del mismo lugar del archivo, y elegir entre ellas es una decision de contenido, no algo que se pueda resolver con un algoritmo de diff. Para que nunca hubiera aparecido el conflicto, alguna de las dos ramas tendria que haber hecho \pull\/rebase de \main\ antes de tocar esa linea, viendo el cambio de la otra rama antes de proponer el propio.
 
-### Problemas encontrados y c?mo los resolv?
+### Problemas encontrados y como los resolv?
 
-- El push directo a \main\ fue rechazado por la protecci?n de rama configurada ? confirm? que la regla alcanza tambi?n al due?o del repositorio, no solo a colaboradores externos.
-- Adem?s del conflicto resuelto en el Pull Request, en alg?n punto me qued? un merge sin terminar **localmente**: Git bloqueaba \git switch main\ con el error \README.md: needs merge\ / \you need to resolve your current index first\. Eso significa que hab?a un conflicto de merge a mitad de resolver en mi copia local, distinto del conflicto ya resuelto en GitHub. Until it was cleared, ninguna rama nueva se pod?a crear. Lo resolv? revisando el estado con \git status\, identificando el archivo a medio resolver (\README.md\), completando su resoluci?n y confirmando el commit del merge antes de poder cambiar de rama.
+- El push directo a \main\ fue rechazado por la proteccion de rama configurada o confirmo que la regla alcanza tambien al dueño del repositorio, no solo a colaboradores externos.
+- Ademas del conflicto resuelto en el Pull Request, en algun punto me quedo un merge sin terminar **localmente**: Git bloqueaba \git switch main\ con el error \README.md: needs merge\ / \you need to resolve your current index first\. Eso significa que habia un conflicto de merge a mitad de resolver en mi copia local, distinto del conflicto ya resuelto en GitHub. Until it was cleared, ninguna rama nueva se podia crear. Lo resolvi revisando el estado con \git status\, identificando el archivo a medio resolver (\README.md\), completando su resolucion y confirmando el commit del merge antes de poder cambiar de rama.
 
-### Declaraci?n de uso de IA
+### Declaracion de uso de IA
 
-Us? ChatGPT puntualmente para diagnosticar el error de merge local (\
+Use ChatGPT puntualmente para diagnosticar el error de merge local (\
 eeds merge\ / \
-esolve your current index first\) que me bloqueaba \git switch main\ ? no lograba identificar por qu? Git no me dejaba cambiar de rama si en apariencia no hab?a nada pendiente de mergear en GitHub. La IA me explic? que el problema estaba en mi copia local, no en el remoto, y me guio a revisar \git status\ para encontrar el archivo a medio resolver. Lo verifiqu? corriendo yo misma cada comando sugerido y confirmando en la salida de \git status\ que el conflicto local desaparec?a antes de continuar. El resto del TP (ramas, PR, protecci?n de \main\, release) lo hice siguiendo la gu?a de la c?tedra sin asistencia adicional de IA.
+esolve your current index first\) que me bloqueaba \git switch main\ ? no lograba identificar por que Git no me dejaba cambiar de rama si en apariencia no habia nada pendiente de mergear en GitHub. La IA me explico que el problema estaba en mi copia local, no en el remoto, y me guio a revisar \git status\ para encontrar el archivo a medio resolver. Lo verifique corriendo yo misma cada comando sugerido y confirmando en la salida de \git status\ que el conflicto local desaparecia antes de continuar. El resto del TP (ramas, PR, protecci?n de \main\, release) lo hice siguiendo la guia de la catedra sin asistencia adicional de IA.
 
 
 ## TP2 — Contenedores
