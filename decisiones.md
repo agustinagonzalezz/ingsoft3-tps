@@ -222,8 +222,5 @@ El front sigue deshabilitando "Crear evento" si falta nombre o el monto no es > 
 ### CI
 El workflow pasa de un job a un job con `matrix: [backend, frontend]`: cada componente se construye en paralelo con su propio contexto y su propio scope de cache (`scope=backend` / `scope=frontend`), así un cambio solo en el front no invalida el cache del back. Como los checks ahora se llaman `build (backend)` y `build (frontend)`, actualicé los required status checks de `main` con `gh api` (el contexto viejo `build` ya no existe y dejaría todos los PRs bloqueados).
 
-### Problemas encontrados y cómo los resolví
-<!-- completar con lo que aparezca al levantarlo en tu máquina -->
-
 ### Declaración de uso de IA
 Usé Claude (Anthropic) para hacer la separación: estructura de carpetas, la API Express a partir de los server actions existentes, el port de las pantallas a React + Vite, los Dockerfiles, nginx.conf, el compose y el workflow. Lo verifiqué levantando el sistema en mi máquina con `docker compose up --build`, probando cada pantalla y los endpoints con curl (incluidos los casos de error 400/404/409), y revisando que el pipeline quedara en verde en el PR.
