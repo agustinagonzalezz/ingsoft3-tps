@@ -193,3 +193,37 @@ Verifiqué que el error de "Cannot merge binary files" que mostró Git no era un
 ### Declaración de uso de IA
 Usé Claude (Anthropic) como asistente durante todo el TP4: adaptación del workflow de dos jobs a uno solo (justificada por mi Dockerfile único), redacción del YAML con cache de capas, configuración del gate vía `gh api`, diagnóstico del conflicto de merge en el README y de la protección de rama mal guardada, y armado de la secuencia de la demo (romper el build → PR bloqueado → fix → verde → merge). Verifiqué cada paso ejecutando los comandos yo mismo: revisé el log de cada corrida en la pestaña Actions (`CACHED` en las capas, el error real de TypeScript al romper el build), el estado real de la protección de rama con `gh api`, y el resultado final del README y el badge en GitHub antes de dar cada paso por cerrado.
 el badge en GitHub antes de dar cada paso por cerrado.
+
+## Refactor: separación frontend / backend
+
+### Qué cambió y por qué
+Hasta el TP4 la app era un único proceso Next.js (páginas SSR + server actions que hablaban directo con Prisma), y en el TP2 justifiqué una sola imagen por eso. Al revisarlo con el profesor, el requisito mínimo de la materia ("frontend + backend + base de datos") pide que sean **componentes separados**, así que revisé esa decisión: el repo pasa a tener `backend/` y `frontend/`, cada uno con su `package.json`, su Dockerfile y su imagen.
+
+- **Backend** (`backend/`): API REST con Express 5 + Prisma 7. Es el único que conoce la base. Reutiliza tal cual `schema.prisma`, la migración existente y `rules.ts` (las 6 reglas de negocio puras), así que no hubo que migrar datos ni reescribir la lógica.
+- **Frontend** (`frontend/`): SPA React + Vite, las mismas 3 pantallas. Los server actions de Next se reemplazaron por llamadas `fetch` a `/api/...` centralizadas en `src/api.ts`.
+- **Elegí React + Vite + nginx en vez de mantener Next.js** porque es el mismo patrón que el sample de la cátedra: la SPA llama a rutas relativas y nginx proxea `/api` al backend por la red de compose. Así no hay CORS y la imagen del front no tiene la URL del backend "horneada", lo que va a importar en TP6/TP7 (misma imagen, distintos entornos). Con Next, el proxy (`rewrites`) se resuelve en build time.
+- **Express en vez de Go** (que también manejo) porque permitía reutilizar Prisma, el schema y `rules.ts` sin reescribirlos.
+
+### Qué se simplificó gracias a la separación
+- Desaparecieron los dos parches del TP2: el `DATABASE_URL` falso en build time y el `force-dynamic` en las páginas. Ahora el build del backend es solo `tsc` (no ejecuta código ni intenta conectarse a nada) y el front no tiene acceso a la base.
+- Desapareció la etapa `prisma-cli`: como el backend ya no usa el `standalone` de Next, `prisma` pasa a ser dependencia de runtime, se instala con `npm ci`, se compila y después `npm prune --omit=dev` saca las devDependencies. El `node_modules` que llega a la imagen final lo arma npm en una sola etapa, con los symlinks correctos.
+
+### Arquitectura de contenedores
+3 servicios en `docker-compose.yml`:
+- `postgres` (igual que antes, con healthcheck `pg_isready`).
+- `backend` (`node:22-alpine`, 2 etapas: build → runtime, usuario `node` no-root). Al arrancar corre `prisma migrate deploy` y después la API en el 8080. Tiene healthcheck contra `/api/health`.
+- `frontend` (2 etapas: `node:22-alpine` compila con Vite → `nginx:alpine` sirve los estáticos; Node no viaja a la imagen final). Publicado en el 3000 (misma URL que antes). Espera a que el backend esté `service_healthy`.
+
+La cadena de arranque queda `postgres healthy → backend healthy → frontend`, así nginx nunca recibe tráfico de `/api` sin backend detrás.
+
+### Validaciones: front vs back
+El front sigue deshabilitando "Crear evento" si falta nombre o el monto no es > 0 (regla de UI, sirve para los tests de frontend del TP5), pero **el backend vuelve a validar** y responde 400: cualquiera puede pegarle a la API sin pasar por el formulario. De la misma forma, borrar un evento con pagos devuelve 409, y el monto de un pago ahora lo calcula el backend (antes lo mandaba el cliente y se podía registrar cualquier importe).
+
+### CI
+El workflow pasa de un job a un job con `matrix: [backend, frontend]`: cada componente se construye en paralelo con su propio contexto y su propio scope de cache (`scope=backend` / `scope=frontend`), así un cambio solo en el front no invalida el cache del back. Como los checks ahora se llaman `build (backend)` y `build (frontend)`, actualicé los required status checks de `main` con `gh api` (el contexto viejo `build` ya no existe y dejaría todos los PRs bloqueados).
+
+### Problemas encontrados y cómo los resolví
+<!-- completar con lo que aparezca al levantarlo en tu máquina -->
+
+### Declaración de uso de IA
+Usé Claude (Anthropic) para hacer la separación: estructura de carpetas, la API Express a partir de los server actions existentes, el port de las pantallas a React + Vite, los Dockerfiles, nginx.conf, el compose y el workflow. Lo verifiqué levantando el sistema en mi máquina con `docker compose up --build`, probando cada pantalla y los endpoints con curl (incluidos los casos de error 400/404/409), y revisando que el pipeline quedara en verde en el PR.

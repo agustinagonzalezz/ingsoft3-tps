@@ -8,12 +8,19 @@ on:
 
 jobs:
   build:
+    # Un job por componente: backend y frontend se construyen en paralelo,
+    # cada uno con su propio contexto, Dockerfile y cache.
+    strategy:
+      fail-fast: false
+      matrix:
+        componente: [backend, frontend]
+    name: build (${{ matrix.componente }})
     runs-on: ubuntu-latest
     steps:
       - name: Qué estamos verificando
         env:
           RAMA: ${{ github.head_ref || github.ref_name }}
-        run: echo "Rama $RAMA · commit $GITHUB_SHA"
+        run: echo "Rama $RAMA · commit $GITHUB_SHA · componente ${{ matrix.componente }}"
 
       - name: Bajar el código al runner
         uses: actions/checkout@v6
@@ -21,11 +28,11 @@ jobs:
       - name: Preparar el constructor que sabe cachear
         uses: docker/setup-buildx-action@v4
 
-      - name: Construir la imagen de la app
+      - name: Construir la imagen (${{ matrix.componente }})
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: ./${{ matrix.componente }}
           push: false
-          tags: ingsoft3-tps:ci
-          cache-from: type=gha,scope=app
-          cache-to: type=gha,mode=max,scope=app
+          tags: ingsoft3-tps-${{ matrix.componente }}:ci
+          cache-from: type=gha,scope=${{ matrix.componente }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.componente }}

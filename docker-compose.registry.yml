@@ -1,3 +1,5 @@
+# Igual que docker-compose.yml, pero usando las imágenes publicadas en GHCR
+# en vez de construirlas. Sirve para levantar el sistema sin el código fuente.
 services:
   postgres:
     image: postgres:16
@@ -15,14 +17,27 @@ services:
       interval: 5s
       retries: 10
 
-  app:
-    image: ghcr.io/agustinagonzalezz/ingsoft3-tp01:v0.1.0
+  backend:
+    image: ghcr.io/agustinagonzalezz/teampay-backend:v0.2.0
     environment:
       DATABASE_URL: "postgresql://tpinge3:${DB_PASSWORD}@postgres:5432/tpinge3_db"
     ports:
-      - "3000:3000"
+      - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    image: ghcr.io/agustinagonzalezz/teampay-frontend:v0.2.0
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
         condition: service_healthy
 
 volumes:
