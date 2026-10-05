@@ -1,0 +1,3 @@
+# Los scripts de shell corren dentro de contenedores Linux: siempre LF,
+# aunque se editen en Windows (un CRLF rompe el shebang del entrypoint).
+*.sh text eol=lf

@@ -5,25 +5,64 @@
 App de gestion de jugadoras, eventos y pagos de un equipo. Repo del semestre
 para Ingenieria de Software 3 (UCC).
 
-**Stack:** Next.js 16 (App Router) + Prisma 7 (@prisma/adapter-pg) + PostgreSQL.
+## Arquitectura
+
+```
+browser ──> frontend (nginx :80, publicado en :3000)
+              ├─ /        -> SPA React (archivos estaticos)
+              └─ /api/*   -> proxy a backend:8080 ──> postgres:5432
+```
+
+| Carpeta     | Que es                                   | Stack                                  |
+|-------------|------------------------------------------|----------------------------------------|
+| `backend/`  | API REST + reglas de negocio + migraciones | Node 22, Express 5, Prisma 7 (adapter-pg), TypeScript |
+| `frontend/` | SPA (3 pantallas: jugadoras, eventos, dashboard) | React 19, Vite, React Router, Tailwind 4 |
+| raiz        | orquestacion y CI                         | docker-compose, GitHub Actions         |
+
+El frontend **nunca** habla con la base: todo pasa por la API. Llama siempre a
+rutas relativas (`/api/...`); quien las lleva al backend es el proxy de Vite en
+desarrollo y nginx en el contenedor. Por eso no hace falta CORS y la misma
+imagen del front sirve en cualquier entorno.
+
+### Endpoints
+
+| Metodo | Ruta                                       | Que hace                                   |
+|--------|--------------------------------------------|--------------------------------------------|
+| GET    | `/api/health`                              | healthcheck                                |
+| GET    | `/api/dashboard`                           | recaudado, pendiente, gastos, balance      |
+| GET    | `/api/jugadoras`                           | lista con la deuda calculada               |
+| POST   | `/api/jugadoras`                           | alta `{ name }`                            |
+| PATCH  | `/api/jugadoras/:id`                       | `{ name?, active? }`                       |
+| GET    | `/api/eventos`                             | eventos con participantes y estado de pago |
+| POST   | `/api/eventos`                             | alta `{ name, type, amount, dueDate }` (400 si monto <= 0) |
+| DELETE | `/api/eventos/:id`                         | 409 si el evento tiene pagos               |
+| POST   | `/api/eventos/:eventId/eximir/:playerId`   | exime a una jugadora de un evento          |
+| PUT    | `/api/participaciones/:id/pago`            | marca pagada (el monto lo calcula el back) |
+| DELETE | `/api/participaciones/:id/pago`            | desmarca el pago                           |
 
 ## Arranque con Docker (recomendado)
 
 Requisitos: Docker y Docker Compose instalados.
 
 ```bash
-git clone https://github.com/agustinagonzalezz/ingsoft3-tp01.git
-cd ingsoft3-tp01
+git clone https://github.com/agustinagonzalezz/ingsoft3-tps.git
+cd ingsoft3-tps
 
 cp .env.example .env
-# (opcional) edita .env y pone otra contrasena para la BD local
-
 docker compose up -d --build
-docker compose ps          # espera a ver "postgres" healthy y "app" running
-docker compose logs app    # confirma que "prisma migrate deploy" corrio sin errores
+docker compose ps              # postgres y backend "healthy", frontend "running"
+docker compose logs backend    # confirma que "prisma migrate deploy" corrio sin errores
 ```
 
-La app queda disponible en http://localhost:3000
+- App: http://localhost:3000
+- API directa (para curl/Postman): http://localhost:8080/api/health
+
+Datos de ejemplo (opcional): la imagen de produccion no trae `tsx`, asi que el
+seed se corre desde tu maquina contra la base del compose (publicada en 5432):
+
+```bash
+cd backend && npm install && cp .env.example .env && npm run seed
+```
 
 ### Probar persistencia
 
@@ -41,24 +80,35 @@ docker compose down -v && docker compose up -d
 docker compose -f docker-compose.registry.yml up -d
 ```
 
-Baja la imagen ya publicada en ghcr.io/agustinagonzalezz/ingsoft3-tp01:v0.1.0
-en vez de construirla localmente.
+Usa `ghcr.io/agustinagonzalezz/teampay-backend` y `teampay-frontend` en vez de
+construirlas localmente.
 
-## Desarrollo local (sin Docker)
+## Desarrollo local (sin Docker para el codigo)
 
-Si preferis correr la app directo en tu maquina (con Postgres dockerizado
-aparte):
+Tres terminales:
 
 ```bash
-docker compose up -d postgres   # solo la base, publicada en localhost:5432
+# 1) solo la base, publicada en localhost:5432
+docker compose up -d postgres
+
+# 2) backend en http://localhost:8080
+cd backend
+cp .env.example .env
+npm install
+npx prisma migrate deploy
+npm run seed        # opcional: datos de ejemplo
+npm run dev
+
+# 3) frontend en http://localhost:5173 (Vite proxea /api al backend)
+cd frontend
 npm install
 npm run dev
 ```
 
-Asegurate de que DATABASE_URL en tu .env apunte a localhost:5432 (no a
-postgres:5432, que solo funciona dentro de la red de Docker).
+`DATABASE_URL` en `backend/.env` apunta a `localhost:5432`, no a
+`postgres:5432` (ese nombre solo resuelve dentro de la red de Docker).
 
-## Documentacion del TP2 (Dockerizacion)
+## Documentacion
 
-- decisiones.md: justificacion de la app elegida y decisiones de arquitectura de contenedores.
-- evidencias.md: capturas de todo funcionando de punta a punta.
+- `decisiones.md`: decisiones de cada TP (incluida la separacion front/back).
+- `evidencias.md`: capturas del TP2.

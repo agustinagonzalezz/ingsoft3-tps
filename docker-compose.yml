@@ -1,3 +1,6 @@
+# Sistema completo: base de datos + backend (API) + frontend (SPA en nginx).
+# Solo el frontend necesita estar publicado; el puerto del backend se publica
+# para poder probar la API con curl/Postman, y el de la base para Prisma Studio.
 services:
   postgres:
     image: postgres:16
@@ -15,14 +18,27 @@ services:
       interval: 5s
       retries: 10
 
-  app:
-    build: .
+  backend:
+    build: ./backend
     environment:
       DATABASE_URL: "postgresql://tpinge3:${DB_PASSWORD}@postgres:5432/tpinge3_db"
     ports:
-      - "3000:3000"
+      - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
         condition: service_healthy
 
 volumes:
