@@ -29,8 +29,12 @@ export type Dashboard = { recaudado: number; pendiente: number; gastos: number; 
 
 export type NuevoEvento = { name: string; type: EventType; amount: number; dueDate: string };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+// El "contrato" del cliente HTTP: misma forma que fetch.
+// En la app entra el fetch real; en los tests, un vi.fn().
+export type Traer = (url: string, init?: RequestInit) => Promise<Response>;
+
+export async function request<T>(traer: Traer, path: string, init?: RequestInit): Promise<T> {
+  const res = await traer(`/api${path}`, {
     ...init,
     headers: init?.body ? { "Content-Type": "application/json" } : undefined,
   });
@@ -41,24 +45,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+// El cliente REAL, en un solo lugar (el equivalente del registro en Program.cs).
+// Arrow function y no `fetch` suelto: si fetch se llama como método de otro
+// objeto, el navegador tira "Illegal invocation".
+const traerReal: Traer = (url, init) => fetch(url, init);
+const llamar = <T>(path: string, init?: RequestInit) => request<T>(traerReal, path, init);
+
 const json = (method: string, body?: unknown): RequestInit => ({
   method,
   body: body === undefined ? undefined : JSON.stringify(body),
 });
 
 export const api = {
-  getDashboard: () => request<Dashboard>("/dashboard"),
+  getDashboard: () => llamar<Dashboard>("/dashboard"),
 
-  getJugadoras: () => request<Jugadora[]>("/jugadoras"),
-  crearJugadora: (name: string) => request("/jugadoras", json("POST", { name })),
+  getJugadoras: () => llamar<Jugadora[]>("/jugadoras"),
+  crearJugadora: (name: string) => llamar("/jugadoras", json("POST", { name })),
   editarJugadora: (id: string, cambios: { name?: string; active?: boolean }) =>
-    request(`/jugadoras/${id}`, json("PATCH", cambios)),
+    llamar(`/jugadoras/${id}`, json("PATCH", cambios)),
 
-  getEventos: () => request<EventoVM[]>("/eventos"),
-  crearEvento: (evento: NuevoEvento) => request("/eventos", json("POST", evento)),
-  eliminarEvento: (id: string) => request(`/eventos/${id}`, json("DELETE")),
-  eximir: (eventId: string, playerId: string) => request(`/eventos/${eventId}/eximir/${playerId}`, json("POST")),
+  getEventos: () => llamar<EventoVM[]>("/eventos"),
+  crearEvento: (evento: NuevoEvento) => llamar("/eventos", json("POST", evento)),
+  eliminarEvento: (id: string) => llamar(`/eventos/${id}`, json("DELETE")),
+  eximir: (eventId: string, playerId: string) => llamar(`/eventos/${eventId}/eximir/${playerId}`, json("POST")),
 
-  marcarPago: (participacionId: string) => request(`/participaciones/${participacionId}/pago`, json("PUT")),
-  desmarcarPago: (participacionId: string) => request(`/participaciones/${participacionId}/pago`, json("DELETE")),
+  marcarPago: (participacionId: string) => llamar(`/participaciones/${participacionId}/pago`, json("PUT")),
+  desmarcarPago: (participacionId: string) => llamar(`/participaciones/${participacionId}/pago`, json("DELETE")),
 };
