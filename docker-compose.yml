@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U tpinge3 -d tpinge3_db"]
+      test: ["CMD-SHELL", "pg_isready -U tpinge3 -d tpinge3_db"]
       interval: 5s
       retries: 10
 
