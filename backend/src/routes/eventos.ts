@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { eximirJugadora, puedeEliminarEvento, validarNuevoEvento } from "../rules.js";
-import { toEvento, toPago } from "../mappers.js";
+import { toEvento, toEventoVM, toPago, toParticipante } from "../mappers.js";
 
 export const eventosRouter = Router();
 
@@ -12,28 +12,7 @@ eventosRouter.get("/", async (_req, res) => {
     include: { participants: { include: { player: true, payments: true } } },
   });
 
-  res.json(
-    eventos.map((evento) => {
-      const amount = evento.amount.toNumber();
-      const pagos = evento.participants.flatMap((p) => p.payments.map(toPago));
-      return {
-        id: evento.id,
-        name: evento.name,
-        type: evento.type,
-        amount,
-        dueDate: evento.dueDate,
-        puedeEliminar: puedeEliminarEvento(toEvento(evento), pagos),
-        participantes: evento.participants.map((p) => ({
-          eventParticipantId: p.id,
-          playerId: p.playerId,
-          playerName: p.player.name,
-          montoEsperado: p.amountOverride?.toNumber() ?? amount,
-          exempt: p.exempt,
-          pagada: p.payments.length > 0,
-        })),
-      };
-    })
-  );
+  res.json(eventos.map(toEventoVM));
 });
 
 // POST /api/eventos { name, type, amount, dueDate }
@@ -85,7 +64,7 @@ eventosRouter.delete("/:id", async (req, res) => {
 eventosRouter.post("/:eventId/eximir/:playerId", async (req, res) => {
   const { eventId, playerId } = req.params;
   const actuales = await db.eventParticipant.findMany({ where: { eventId } });
-  const numericos = actuales.map((p) => ({ ...p, amountOverride: p.amountOverride?.toNumber() ?? null }));
+  const numericos = actuales.map(toParticipante);
 
   // La lógica de "quién queda exenta" vive en rules.ts (pura, testeable);
   // acá solo persistimos el resultado.
