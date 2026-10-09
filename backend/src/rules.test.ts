@@ -5,6 +5,7 @@ import {
   calcularPendienteEquipo,
   calcularDeudaJugadora,
   deudaActual,
+  estadoDeEvento,
   eximirJugadora,
   jugadoraInactivaSinDeudaFutura,
   puedeEliminarEvento,
@@ -275,5 +276,42 @@ describe("armarCambiosJugadora", () => {
 
   it("sin body no explota (Express 5 deja req.body undefined si no viene JSON)", () => {
     expect(armarCambiosJugadora(undefined, AHORA)).toEqual({ ok: true, cambios: {} });
+  });
+});
+
+// ---- Estado de cobro de un evento: un test por cada camino que declara la función ----
+describe("estadoDeEvento", () => {
+  // evento() vence el 1/3/2026 con una participante (p1) que no pagó.
+  const ANTES = new Date("2026-02-20T00:00:00.000Z"); // faltan 9 días
+
+  it("sin participantes que deban pagar → sin-participantes (también si todas están exentas)", () => {
+    expect(estadoDeEvento(evento({ participants: [] }), [], ANTES)).toBe("sin-participantes");
+    expect(estadoDeEvento(evento({ participants: [participante({ exempt: true })] }), [], ANTES)).toBe(
+      "sin-participantes"
+    );
+  });
+
+  it("si todas las que deben pagaron → cobrado (aunque ya haya vencido)", () => {
+    const despues = new Date("2026-04-01T00:00:00.000Z");
+
+    expect(estadoDeEvento(evento(), [pago()], despues)).toBe("cobrado");
+  });
+
+  it("si falta una sola, no está cobrado", () => {
+    const dos = evento({ participants: [participante({ id: "p1" }), participante({ id: "p2", playerId: "j2" })] });
+
+    expect(estadoDeEvento(dos, [pago({ eventParticipantId: "p1" })], ANTES)).toBe("pendiente");
+  });
+
+  // Los tres caminos que dependen de la fecha, con sus bordes (vence el 1/3 a las 00:00 UTC).
+  it.each([
+    ["un día después del vencimiento", "2026-03-02T00:00:00.000Z", "vencido"],
+    ["un milisegundo después del vencimiento", "2026-03-01T00:00:00.001Z", "vencido"],
+    ["el momento exacto del vencimiento", "2026-03-01T00:00:00.000Z", "vence-pronto"],
+    ["a exactamente 3 días", "2026-02-26T00:00:00.000Z", "vence-pronto"],
+    ["a 3 días y un milisegundo", "2026-02-25T23:59:59.999Z", "pendiente"],
+    ["a 9 días", "2026-02-20T00:00:00.000Z", "pendiente"],
+  ])("con deuda, %s → %s", (_caso, ahora, esperado) => {
+    expect(estadoDeEvento(evento(), [], new Date(ahora))).toBe(esperado);
   });
 });
