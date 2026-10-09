@@ -18,6 +18,10 @@ export default defineConfig({
         "src/generated/**", // cliente generado por `prisma generate`
         "src/index.ts", // arranque: lee PORT y llama a listen()
         "src/db.ts", // arma el PrismaClient con la URL del entorno
+        // Recién después de sacar su lógica a rules.ts / mappers.ts / services/:
+        "src/app.ts", // cablea Express: routers, JSON y el manejador de errores
+        "src/routes/**", // handlers: piden a la base, delegan y traducen a HTTP
+        "src/repos/**", // implementación real de PagosRepo (Prisma): se prueba de punta a punta en el TP7
       ],
       // Umbral: TODAVÍA NO. Primero medimos, después elegimos el número.
     },
