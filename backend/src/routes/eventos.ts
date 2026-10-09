@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import { eximirJugadora, puedeEliminarEvento, validarMontoEvento } from "../rules.js";
+import { eximirJugadora, puedeEliminarEvento, validarNuevoEvento } from "../rules.js";
 import { toEvento, toPago } from "../mappers.js";
-import { EventType } from "../generated/prisma/enums.js";
 
 export const eventosRouter = Router();
 
@@ -39,25 +38,13 @@ eventosRouter.get("/", async (_req, res) => {
 
 // POST /api/eventos { name, type, amount, dueDate }
 eventosRouter.post("/", async (req, res) => {
-  const name = String(req.body?.name ?? "").trim();
-  const type = String(req.body?.type ?? "");
-  const amount = Number(req.body?.amount);
-  const dueDate = String(req.body?.dueDate ?? "");
-
-  if (!name || !dueDate || Number.isNaN(Date.parse(dueDate))) {
-    res.status(400).json({ error: "Nombre y fecha de vencimiento son obligatorios" });
+  // Validación y normalización en rules.ts (pura, testeable): acá solo se traduce a HTTP.
+  const validacion = validarNuevoEvento(req.body);
+  if (!validacion.ok) {
+    res.status(400).json({ error: validacion.error });
     return;
   }
-  if (!(type in EventType)) {
-    res.status(400).json({ error: `Tipo de evento inválido: ${type}` });
-    return;
-  }
-  // Regla 4: el monto debe ser > 0. El front también lo valida, pero el
-  // backend no puede confiar en eso: cualquiera puede pegarle a la API.
-  if (!validarMontoEvento(amount)) {
-    res.status(400).json({ error: "El monto debe ser mayor a 0" });
-    return;
-  }
+  const { name, type, amount, dueDate } = validacion.datos;
 
   // Todas las jugadoras activas al momento de crear el evento quedan
   // enroladas como participantes (y por lo tanto, como deudoras).
@@ -65,9 +52,9 @@ eventosRouter.post("/", async (req, res) => {
   const evento = await db.event.create({
     data: {
       name,
-      type: type as EventType,
+      type,
       amount,
-      dueDate: new Date(dueDate),
+      dueDate,
       participants: { create: activas.map((j) => ({ playerId: j.id })) },
     },
   });

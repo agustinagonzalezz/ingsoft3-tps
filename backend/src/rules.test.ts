@@ -6,6 +6,7 @@ import {
   jugadoraInactivaSinDeudaFutura,
   puedeEliminarEvento,
   validarMontoEvento,
+  validarNuevoEvento,
   type Evento,
   type Jugadora,
   type Pago,
@@ -157,5 +158,39 @@ describe("jugadoraInactivaSinDeudaFutura", () => {
     const eventos = [evento({ id: "a" }), evento({ id: "b" })];
 
     expect(jugadoraInactivaSinDeudaFutura(jugadora(), eventos)).toEqual(eventos);
+  });
+});
+
+describe("validarNuevoEvento", () => {
+  const valido = { name: "  Cuota octubre ", type: "CUOTA", amount: "3000", dueDate: "2026-10-15" };
+
+  it("con un body válido devuelve los datos normalizados", () => {
+    const resultado = validarNuevoEvento(valido);
+
+    expect(resultado).toEqual({
+      ok: true,
+      datos: { name: "Cuota octubre", type: "CUOTA", amount: 3000, dueDate: new Date("2026-10-15") },
+    });
+  });
+
+  it.each([
+    ["sin nombre", { name: "" }, "Nombre y fecha de vencimiento son obligatorios"],
+    ["con nombre de solo espacios", { name: "   " }, "Nombre y fecha de vencimiento son obligatorios"],
+    ["sin fecha", { dueDate: "" }, "Nombre y fecha de vencimiento son obligatorios"],
+    ["con una fecha que no es fecha", { dueDate: "31/12/2026" }, "Nombre y fecha de vencimiento son obligatorios"],
+    ["con un tipo inexistente", { type: "FIESTA" }, "Tipo de evento inválido: FIESTA"],
+    ["con un tipo que hereda del prototipo", { type: "constructor" }, "Tipo de evento inválido: constructor"],
+    ["con monto 0", { amount: 0 }, "El monto debe ser mayor a 0"],
+    ["con monto negativo", { amount: -100 }, "El monto debe ser mayor a 0"],
+    ["con monto no numérico", { amount: "abc" }, "El monto debe ser mayor a 0"],
+  ])("rechaza un evento %s", (_caso, cambio, error) => {
+    expect(validarNuevoEvento({ ...valido, ...cambio })).toEqual({ ok: false, error });
+  });
+
+  it("sin body no explota: pide nombre y fecha", () => {
+    expect(validarNuevoEvento(undefined)).toEqual({
+      ok: false,
+      error: "Nombre y fecha de vencimiento son obligatorios",
+    });
   });
 });
