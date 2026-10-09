@@ -126,35 +126,6 @@ la sección de problemas de arriba) y puedo defenderlo en la mesa: qué hace
 cada etapa del Dockerfile, por qué el CLI necesita su propia etapa, y por qué
 las páginas necesitan `force-dynamic`.
 
-## TP4 - CI: Pipelines as Code
-
-### Estructura elegida del pipeline
-
-Mi app tiene un ?nico Dockerfile (Next.js con App Router unifica front y back en un solo proceso, decisi?n ya justificada en el TP2), as? que el pipeline tiene **un solo job** (\uild\) en vez de los dos jobs en paralelo (backend/frontend) que propone la gu?a para stacks separados. No invent? un segundo job vac?o para llegar a un n?mero: el pipeline construye exactamente lo que la app tiene. El trigger es \pull_request\ (verifica antes del merge, alimenta el gate) y \push\ a \main\ (deja la corrida que lee el badge y que adem?s guarda el cache que despu?s reutiliza cualquier PR nuevo).
-
-### Qu? cachea el pipeline
-
-Se cachean las capas de la imagen Docker v?a \docker/setup-buildx-action\ + \cache-from\/\cache-to: type=gha\. En la segunda corrida del mismo PR, **todas** las capas mostraron \CACHED\: la instalaci?n de dependencias (\
-pm ci\), la generaci?n de Prisma (\
-px prisma generate\), el build de Next (\
-pm run build\) y todas las copias entre etapas del Dockerfile multi-stage. Esto tiene sentido porque entre una corrida y la otra no cambi? ning?n archivo relevante (us? un commit vac?o para dispararla). Si el cache desaparece, el pipeline sigue funcionando igual, solo que reconstruye todo desde cero ? no es una dependencia real, es una optimizaci?n de velocidad.
-
-### Por qu? el pipeline construye con mi Dockerfile en vez de compilar por su cuenta
-
-Si el workflow corriera \
-pm run build\ directamente en vez de delegarle todo a \docker build\, tendr?a dos definiciones distintas de c?mo se arma la app: la que usa el pipeline para verificar, y la que uso despu?s para desplegar (v?a el mismo Dockerfile). Con el tiempo esas dos definiciones divergen y terminar?a verificando algo distinto de lo que realmente se despliega. Usando el Dockerfile como ?nica fuente de verdad, lo que el pipeline verifica es exactamente lo que se va a correr en producci?n.
-
-### Problemas encontrados y c?mo los resolv?
-
-- Al configurar el gate por la web (Settings ? Branches ? Require status checks), el checkbox se guard? pero el campo \contexts\ qued? vac?o ? lo detect? corriendo \gh api .../branches/main/protection --jq '.required_status_checks'\ antes de seguir. Lo resolv? aplicando la protecci?n completa v?a \gh api --method PUT\, re-declarando tambi?n lo que ya ten?a del TP1 (0 approvals + \enforce_admins: true\) para no perderlo, ya que el PUT reescribe la protecci?n entera en vez de mezclarla.
-- Al agregar el badge del README en un PR nuevo, el merge con \main\ gener? un conflicto porque un PR anterior (el de relleno de la demo del gate) hab?a agregado una l?nea en blanco al final del mismo archivo. Lo resolv? actualizando primero mi \main\ local (estaba desactualizado respecto del remoto, por eso \git merge main\ no tra?a nada al principio), y despu?s resolviendo el conflicto a mano en VS Code conservando ambos cambios: el badge arriba y el resto del contenido tal como estaba.
-- Verifiqu? que el error de \"Cannot merge binary files\" que mostr? Git no era un problema real de codificaci?n (los bytes del archivo eran ASCII/UTF-8 normal) sino un falso positivo del propio Git al intentar el auto-merge; se resolvi? igual editando el archivo directamente.
-
-### Declaraci?n de uso de IA
-
-Us? Claude (Anthropic) como asistente durante todo el TP4: adaptaci?n del workflow de dos jobs a uno solo (justificada por mi Dockerfile ?nico), redacci?n del YAML con cache de capas, configuraci?n del gate v?a \gh api\, diagn?stico del conflicto de merge en el README y de la protecci?n de rama mal guardada, y armado de la secuencia de la demo (romper el build ? PR bloqueado ? fix ? verde ? merge). Verifiqu? cada paso ejecutando los comandos yo mismo: revis? el log de cada corrida en la pesta?a Actions (\CACHED\ en las capas, el error real de TypeScript al romper el build), el estado real de la protecci?n de rama con \gh api\, y el resultado final del README y el badge en GitHub antes de dar cada paso por cerrado.
-
-
 ## TP3 - Planificación y trazabilidad
 
 ### Duración del sprint
@@ -177,6 +148,8 @@ Usé Claude (Anthropic) como asistente durante todo el TP3: guía paso a paso pa
 ## TP4 - CI: Pipelines as Code
 
 ### Estructura elegida del pipeline
+> **Actualización posterior:** después del TP4 separé la app en backend y frontend (ver la sección «Refactor» más abajo) y el pipeline pasó a ser un job con matriz `[backend, frontend]`. Lo que sigue describe cómo estaba al entregar el TP4.
+
 Mi app tiene un único Dockerfile (Next.js con App Router unifica front y back en un solo proceso, decisión ya justificada en el TP2), así que el pipeline tiene un solo job (`build`) en vez de los dos jobs en paralelo (backend/frontend) que propone la guía para stacks separados. No inventé un segundo job vacío para llegar a un número: el pipeline construye exactamente lo que la app tiene. El trigger es `pull_request` (verifica antes del merge, alimenta el gate) y `push` a `main` (deja la corrida que lee el badge y que además guarda el cache que después reutiliza cualquier PR nuevo).
 
 ### Qué cachea el pipeline
@@ -192,7 +165,6 @@ Verifiqué que el error de "Cannot merge binary files" que mostró Git no era un
 
 ### Declaración de uso de IA
 Usé Claude (Anthropic) como asistente durante todo el TP4: adaptación del workflow de dos jobs a uno solo (justificada por mi Dockerfile único), redacción del YAML con cache de capas, configuración del gate vía `gh api`, diagnóstico del conflicto de merge en el README y de la protección de rama mal guardada, y armado de la secuencia de la demo (romper el build → PR bloqueado → fix → verde → merge). Verifiqué cada paso ejecutando los comandos yo mismo: revisé el log de cada corrida en la pestaña Actions (`CACHED` en las capas, el error real de TypeScript al romper el build), el estado real de la protección de rama con `gh api`, y el resultado final del README y el badge en GitHub antes de dar cada paso por cerrado.
-el badge en GitHub antes de dar cada paso por cerrado.
 
 ## Refactor: separación frontend / backend
 
@@ -224,3 +196,142 @@ El workflow pasa de un job a un job con `matrix: [backend, frontend]`: cada comp
 
 ### Declaración de uso de IA
 Usé Claude (Anthropic) para hacer la separación: estructura de carpetas, la API Express a partir de los server actions existentes, el port de las pantallas a React + Vite, los Dockerfiles, nginx.conf, el compose y el workflow. Lo verifiqué levantando el sistema en mi máquina con `docker compose up --build`, probando cada pantalla y los endpoints con curl (incluidos los casos de error 400/404/409), y revisando que el pipeline quedara en verde en el PR.
+
+## TP5 - Calidad automatizada: tests, coverage y el umbral que frena un merge
+
+### En una frase
+El pipeline ahora corre los tests del backend y del frontend en cada PR, mide la cobertura, la muestra en el resumen de la corrida y **no deja mergear** si la cobertura queda por debajo de mi número (90% de líneas y 85% de ramas), aunque el código compile y todos los tests pasen.
+
+### Qué testeé y por qué eso
+Me pregunté dónde duele un bug en TeamPay: en la **plata**. Si una regla calcula mal, a una jugadora se le cobra de más o de menos, o el balance del equipo miente. Por eso la suite se concentra ahí y no en la parte visual.
+
+**Backend** (65 tests, con vitest 5):
+- Las 6 reglas de negocio de `rules.ts`: deuda de una jugadora (con pagos parciales y monto personalizado), balance del equipo (con los bordes de las fechas), no borrar un evento que ya tiene pagos, monto mayor a 0, eximir a una jugadora y que una jugadora inactiva no siga sumando deuda.
+- Lo que antes estaba escondido en las rutas y ahora vive en `rules.ts`/`mappers.ts` (ver "Qué dejé afuera"): validar un evento nuevo, validar y editar jugadoras (incluida la fecha de desactivación), el pendiente del equipo del dashboard y el monto esperado de cada participante.
+- `marcarPago` (el servicio de pagos), con un mock (ver más abajo).
+
+**Frontend** (42 tests, sin DOM):
+- `reglas.ts`: cuándo se habilita "Crear evento", el contador "pagaron / faltan" (las exentas no cuentan), nombre obligatorio y el texto de error.
+- `api.ts`: que cada pedido arme bien la URL, el método y el body, que un 4xx se convierta en el mensaje de error que ve el usuario, y que un 204 no intente leer el body.
+- `format.ts`: formato de moneda y de fecha.
+
+Las tres técnicas que pide el enunciado están **en los dos lados**:
+
+| Técnica | Backend | Frontend |
+|---|---|---|
+| Parametrizado (`it.each`) | montos inválidos (0, negativo, NaN), cuerpos inválidos de un evento, bordes de fecha de `estadoDeEvento` | casos que no dejan crear un evento, nombres válidos e inválidos, una fila por cada ruta de la API |
+| Caso de error / borde | evento sin nombre, tipo inexistente, monto 0, sin body; bordes como `0.01` o "exactamente 3 días" | 404/409/500 de la API, fecha inválida, monto `0.01` |
+| Mock | `marcarPago` con un repo falso | `request` y `crearApi` con un `fetch` falso |
+
+Para saber si un test vale, usé el criterio del enunciado: **cambiar la regla a propósito y ver si algo se pone en rojo**. Lo hice, por ejemplo, cambiando `?? null` por `?? 0` en el mapper (se puso en rojo el test de "sin override") y los bordes de fecha están pensados para que cambiar un `<=` por `<` rompa una fila.
+
+### El test con mock, y el refactor que lo hizo posible
+**Backend.** La lógica de "marcar como pagada" estaba adentro del handler de Express, pegada a Prisma: para probarla necesitaba una base de datos levantada. La moví a `services/pagos.ts` → `marcarPago(repo, id)`. La función ya no conoce Prisma: recibe un `PagosRepo` (dos funciones: buscar la participación y crear el pago). En la app le llega el repo real (`repos/pagosPrisma.ts`); en el test, uno hecho con `vi.fn()`.
+- `buscarParticipacion` es un **stub**: solo devuelve datos preparados (exenta, ya pagada, etc.).
+- `crearPago` es el **mock**: el test verifica *cómo se lo llamó* — `toHaveBeenCalledWith("p1", 1000)` cuando corresponde cobrar, y `not.toHaveBeenCalled()` cuando la jugadora está exenta o ya pagó. Ese segundo assert es el que importa: prueba que no se cobra dos veces.
+
+**Frontend.** Pasó lo mismo con `fetch`: `request` lo llamaba directo. Ahora recibe el cliente HTTP por parámetro (`request(traer, ruta)`), y las rutas de la API se arman con `crearApi(traer)`. En la app se le pasa el `fetch` real en un solo lugar (`traerReal`); en los tests, un `vi.fn()` que registra qué URL y qué método se pidieron. Si mañana alguien cambia una ruta sin querer (por ejemplo `PUT` por `DELETE` en marcar pago), se pone en rojo su fila.
+
+**El límite:** estos tests prueban mi código, no la conexión real entre front y back. Si el backend cambia lo que responde, el mock sigue contestando lo de antes. Eso se verifica de punta a punta en el TP7.
+
+### Herramientas que usé, por fila de la tabla "Tu stack, de un vistazo"
+Mi stack es TypeScript en los dos lados (no .NET), así que usé la columna JS/TS:
+
+| Lo que había que lograr | Lo que usé |
+|---|---|
+| Dónde viven los tests | Al lado del código: `rules.ts` → `rules.test.ts` |
+| Test parametrizado | `it.each` de vitest |
+| Que la dependencia entre desde afuera | Parámetro de la función (`repo`, `traer`) |
+| Fabricar el doble | `vi.fn()` de vitest |
+| Medir la cobertura | `vitest run --coverage` con `@vitest/coverage-v8` (mide líneas **y** ramas sin pedir nada extra) |
+| Umbral que rompe el build | `coverage.thresholds` en `vitest.config.ts` |
+| Qué entra en la cuenta | `coverage.include` / `coverage.exclude` en `vitest.config.ts` |
+| Reporte legible | reporters `text` (consola), `html` (descargable) y `json-summary` (lo lee el pipeline) |
+| Que las herramientas de test entren a la etapa de tests | `npm ci` **sin** `--omit=dev` en la etapa que usan los tests |
+
+### Qué dejé afuera de la cuenta, y por qué
+La regla que seguí: se puede dejar afuera el **arranque** y lo que **no tiene lógica**, pero solo después de sacar de ahí cualquier regla. Al principio, las rutas de Express tenían adentro validaciones y cálculos (validar un evento nuevo, la fecha de desactivación de una jugadora, el pendiente del dashboard). Si las hubiera excluido así, el número habría dado alto escondiendo código sin tests. Así que primero **moví esa lógica a `rules.ts` y `mappers.ts` y le escribí tests**, y recién después excluí.
+
+**Backend** (`backend/vitest.config.ts`):
+- `src/generated/**`: el cliente que genera Prisma. No lo escribí yo.
+- `src/index.ts` y `src/db.ts`: arranque (leen el puerto, crean la conexión).
+- `src/app.ts`: arma Express (rutas, JSON, manejo de errores).
+- `src/routes/**`: los handlers, que ahora solo piden a la base, llaman a la regla y traducen a HTTP (404, 409, 201…).
+- `src/repos/**`: la implementación real del repo contra Prisma. Probarla requiere una base de verdad: se verifica en el TP7.
+
+**Frontend** (`frontend/vitest.config.ts`): en vez de excluir, digo qué **sí** entra: `src/**/*.ts`, es decir, toda la lógica. Los componentes y páginas (`.tsx`) son la parte visual de React y se prueban de punta a punta en el TP7. También quedan afuera los tests y `useApi.ts` (un hook de React que necesita un navegador).
+
+Al principio había puesto en el `include` del front una lista de archivos sueltos (`api.ts`, `format.ts`, `reglas.ts`). Lo cambié porque así **un archivo nuevo sin tests no entraba en la cuenta** y el umbral no lo veía: justo lo que el freno tiene que atrapar. El PR 2 (más abajo) lo demuestra: `recordatorio.ts` apareció solo en el reporte.
+
+Cómo evolucionó la cobertura del backend mientras hacía esto (muestra que el número subió por tests nuevos, no solo por excluir):
+
+| Momento | Tests | Líneas | Ramas |
+|---|---|---|---|
+| Primera medición (solo reglas y pagos) | 20 | 23% | 37% |
+| Después de sacar la lógica de las rutas, sin excluir nada | 55 | 42% | 74% |
+| Excluyendo `app.ts`, `routes/` y `repos/` | 56 | 100% | 100% |
+
+En el front pasó algo parecido: `api.ts` daba 47% de líneas porque nadie probaba sus métodos. No lo excluí: escribí los tests del contrato de rutas y llegó a 100%.
+
+### El umbral: 90% de líneas y 85% de ramas, en los dos lados
+- **Hoy mido 100% de líneas y 100% de ramas** en el backend y en el frontend.
+- **No puse 100** porque me obligaría a testear hasta la última línea defensiva, y un número imposible empuja a escribir tests que ejecutan sin verificar nada solo para llegar (lo que la guía llama ley de Goodhart).
+- **Tampoco puse 80** (el del ejemplo) porque mi código es chico: en el backend hay 74 líneas medidas, y con 80 harían falta unas 19 líneas nuevas sin test para que frene. Con 90, alcanzan unas 9: una función nueva sin tests ya lo pone en rojo.
+- **Pongo umbral en las dos métricas** porque frenan en casos distintos: en mi PR 1 frenó solo líneas y en el PR 2 frenaron las dos.
+- **No pongo umbral en funciones** porque en el front hay una función que dejo sin test a propósito (`traerReal`, el `fetch` real) y me tendría el número en 95,8% para siempre.
+- **Si lo subiera 10 puntos (a 100):** cualquier refactor que agregue una línea de seguridad sin su test rompería el build. **Para poder exigir más** tendría que sumar tests de los handlers con una base real (integración) y volver a meter `routes/` y `repos/` en la cuenta.
+
+### El pipeline (TP4 + tests)
+Los tests corren **adentro de los mismos jobs del TP4** (`build (backend)` y `build (frontend)`), así los required checks de `main` no cambiaron de nombre y el freno quedó puesto solo. A cada Dockerfile le agregué una etapa `test` en el medio, que sale de la etapa de build (mismo código, mismas dependencias) y corre `npm run test:ci`. Por cada componente, el job: construye esa etapa, la corre con `docker run` dejando el reporte en una carpeta compartida, escribe una tabla de cobertura en el resumen de la corrida y sube el reporte HTML como artefacto (`coverage-backend` / `coverage-frontend`). La imagen final sigue sin llevar vitest ni los tests adentro.
+
+El paso del resumen **falla si no hay reporte o si midió 0 líneas**: un 0 de 0 no es "todo cubierto", es que la medición no corrió.
+
+- Corrida con el resumen de cobertura de los dos lados y los reportes descargables: https://github.com/agustinagonzalezz/ingsoft3-tps/actions/runs/37968011476
+
+### El PR bloqueado (PR 1): rojo → tests → verde → merge
+PR: https://github.com/agustinagonzalezz/ingsoft3-tps/pull/25
+
+1. Agregué `estadoDeEvento` en `rules.ts` (dice si un evento está cobrado, vencido, por vencer, etc.) **sin ningún test**. Compila perfecto y los 56 tests existentes pasan.
+2. El check `build (backend)` se puso **en rojo por cobertura**, no por compilación. El log dice: `ERROR: Coverage for lines (85.05%) does not meet global threshold (90%)`. Frenó en **líneas**; las ramas bajaron a 89,33% pero quedaron arriba de 85. Versión: vitest 5.0.3 (desde la 4, una función que nadie llama también resta ramas, por eso bajaron las dos). Como `build (backend)` es required, el PR quedó **BLOCKED**. Corrida roja: https://github.com/agustinagonzalezz/ingsoft3-tps/actions/runs/37968865946
+3. Escribí **un test por cada camino** que declara la función (sin participantes, cobrado, vencido, vence pronto, pendiente), con los bordes de fecha (el momento exacto del vencimiento, exactamente 3 días, 3 días y un milisegundo). Volvió a 100% y quedó verde: https://github.com/agustinagonzalezz/ingsoft3-tps/actions/runs/37989229834
+4. Lo mergeé con "merge commit" para que el historial muestre los dos commits: el que dio rojo y el de los tests.
+
+**Por qué no se podía mergear si compilaba y los tests pasaban:** porque la condición del gate ya no es solo "compila y no falla ningún test", sino también "el código nuevo entra testeado". En el TP4 me frenaba la máquina diciendo "esto no anda"; acá me frena un criterio de calidad que elegí yo.
+
+### El PR que queda abierto (PR 2)
+PR: https://github.com/agustinagonzalezz/ingsoft3-tps/pull/26 — **queda abierto y en rojo hasta la defensa, no se mergea.**
+
+Desde `main` (ya con el umbral), agregué un solo archivo en el frontend, `recordatorio.ts` (arma el mensaje de recordatorio de pago), sin tests. Esta vez frenó el otro job, `build (frontend)`, y en **las dos métricas**: `lines (73.68%)` contra 90 y `branches (60%)` contra 85. Bajó más porque el frontend es más chico (28 líneas medidas). Corrida roja: https://github.com/agustinagonzalezz/ingsoft3-tps/actions/runs/37993039453
+
+### El ejercicio del camino sin cubrir
+Después de testear `mappers.ts`, el reporte lo mostraba con 100% de líneas pero **50% de ramas**:
+1. **Qué línea es:** `backend/src/mappers.ts`, línea 31 en el commit `580cf55` (hoy está en `toParticipante`): `amountOverride: p.amountOverride?.toNumber() ?? null`. No hay ningún `if` a la vista: las dos ramas las abren el `?.` y el `??`. Mis tests solo pasaban por el caso en que la jugadora tiene un monto personalizado.
+2. **Qué entrada la recorrería:** una participante con `amountOverride: null`, o sea, una jugadora que paga el monto normal del evento. En los datos reales es el caso **más común**.
+3. **Qué decidí:** agregar el test. Si alguien cambiara `?? null` por `?? 0`, las reglas entenderían "esta jugadora debe $0" y la deuda de casi todo el equipo desaparecería sin ningún error. Lo comprobé haciendo ese cambio a propósito: el test nuevo se puso en rojo (`expected +0 to be null`) y volví el código atrás.
+
+Encontré otro caso igual en `armarCambiosJugadora` (`body ?? {}`): un PATCH sin body. También agregué el test, porque Express 5 deja `req.body` vacío cuando no viene JSON: si alguien sacara ese `??`, la API respondería un error 500.
+
+### Por qué cobertura alta no garantiza calidad (con un ejemplo mío)
+Tengo 100% en el backend y aun así hay un problema que ningún test ve: en `armarCambiosJugadora`, `Boolean(active)` convierte el texto `"false"` en `true`. Si alguien manda `{"active": "false"}`, la jugadora queda **activa**. La línea se ejecuta en los tests (por eso cuenta como cubierta), pero ningún test prueba ese valor. Mi front manda booleanos, así que hoy no pasa, pero el número no me lo avisa.
+
+Y un test podría sumar cobertura sin verificar nada: llamar a `calcularDeudaJugadora(...)` sin ningún `expect`. Ejecuta todas las líneas y nunca falla. La cobertura mide qué código **se ejecutó**, no qué **se comprobó**; para saber si los tests comprueban, hay que cambiar el código a propósito y ver si algo se pone en rojo (como hice con el `?? 0`).
+
+### Qué NO cubren mis tests
+- La conexión real entre frontend, backend y base (los handlers, Prisma, nginx): TP7.
+- Los componentes de React (que el botón se vea deshabilitado, que el contador se actualice en pantalla): TP7.
+- El caso `"false"` como texto del punto anterior.
+- `traerReal` (el `fetch` real del navegador): testearlo sería testear el navegador.
+
+### Problemas encontrados y cómo los resolví
+- **El Dockerfile del backend borraba vitest.** La etapa de build terminaba con `npm prune --omit=dev`, que saca las dependencias de desarrollo (entre ellas vitest). Una etapa de tests que saliera de ahí no hubiera tenido con qué correr. Moví el `prune` a una etapa aparte que solo usa la imagen final.
+- **Un bug real que encontré al testear.** La validación del tipo de evento usaba `type in EventType`, y `in` también mira las propiedades heredadas de cualquier objeto: `"constructor"` pasaba como tipo válido y la API respondía 500 en vez de 400. Lo cambié por `Object.hasOwn(EventType, type)` y quedó un test con ese caso.
+- **El PR #24 se mergeó con "Squash and merge"** (https://github.com/agustinagonzalezz/ingsoft3-tps/pull/24) y mi rama quedó con una historia distinta a la de `main`. Lo noté porque el push decía `[new branch]` (GitHub había borrado la rama). Comprobé con `git diff` que el contenido era idéntico y moví mi único commit nuevo arriba de `main` con `git rebase --onto`. Desde ahí mergeo con "merge commit".
+- **Docker Hub cortó las descargas con `429 Too Many Requests`** en los runners de GitHub (descargan sin login y comparten IP), así que el PR 2 dio rojo en el paso de construir la imagen, antes de correr los tests: https://github.com/agustinagonzalezz/ingsoft3-tps/actions/runs/37990283055 . No lo tomé como evidencia del freno. Lo arreglé en un PR aparte bajando las imágenes base desde `mirror.gcr.io` (el espejo de Google, misma imagen oficial): https://github.com/agustinagonzalezz/ingsoft3-tps/pull/27 (corrida verde: https://github.com/agustinagonzalezz/ingsoft3-tps/actions/runs/37992240912). El resumen de cobertura sí detectó bien ese caso: falló con "No se generó reportes/coverage/coverage-summary.json".
+- **El YAML del compose quedó mal indentado en un commit** (el healthcheck de postgres). Lo detecté revisando el commit y lo corregí en otro commit.
+- **PowerShell se come el `--`** de `npm test -- --run`, y vitest quedaba mirando cambios en vez de terminar. En mi máquina uso `npx vitest run`.
+- **`${COVERAGE_DIR:-coverage}` no anda en Windows** (es sintaxis de `sh`). El script `test:ci` es el que corre adentro del contenedor (Linux); en mi máquina corro `npx vitest run --coverage`.
+
+### Declaración de uso de IA
+Usé Claude (Anthropic) como asistente durante todo el TP5: para seguir la guía sección por sección y traducir el ejemplo de .NET a mi stack, para los refactors (`marcarPago` con repo inyectado, `request`/`crearApi` con el cliente por parámetro, y sacar la lógica de las rutas a `rules.ts`/`mappers.ts`/`reglas.ts`), para escribir los tests, para los cambios en los Dockerfiles y en `ci.yml`, para diagnosticar los problemas de arriba y para armar este documento.
+
+Cómo lo verifiqué: corrí yo misma cada paso en mi máquina (tests con cobertura, `docker build` de la etapa de tests, `docker compose up` y prueba de cada pantalla después de cada refactor) y revisé cada corrida en GitHub (los logs con el `ERROR: Coverage…`, el estado `BLOCKED` con `gh pr view`, los required checks con `gh api`). Para comprobar que los tests verifican algo de verdad, cambié reglas a propósito y vi que se pusieran en rojo. Puedo explicar qué verifica cada assert y qué casos no están cubiertos (la sección "Qué NO cubren mis tests").
