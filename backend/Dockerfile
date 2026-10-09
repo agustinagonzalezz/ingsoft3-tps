@@ -1,8 +1,9 @@
-# syntax=docker/dockerfile:1
 # Imagen del BACKEND (API Express + Prisma). El frontend tiene su propia imagen.
+# Imágenes base desde mirror.gcr.io (espejo de Docker Hub): en el CI, Docker Hub sin login
+# corta con 429 Too Many Requests (límite por IP, compartida entre runners). Misma imagen oficial.
 
 # ---- Etapa 1: dependencias + build (TypeScript -> JavaScript) ----
-FROM node:22-alpine AS build
+FROM mirror.gcr.io/library/node:22-alpine AS build
 WORKDIR /app
 # Primero solo los manifiestos y el schema: si no cambian, `npm ci` sale de cache.
 # El schema hace falta porque el postinstall corre `prisma generate`.
@@ -26,7 +27,7 @@ FROM build AS prod-deps
 RUN npm prune --omit=dev
 
 # ---- Etapa 4: runtime (sin compilador ni devDependencies) ----
-FROM node:22-alpine AS runtime
+FROM mirror.gcr.io/library/node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
