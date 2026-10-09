@@ -23,7 +23,11 @@ export default defineConfig({
         "src/routes/**", // handlers: piden a la base, delegan y traducen a HTTP
         "src/repos/**", // implementación real de PagosRepo (Prisma): se prueba de punta a punta en el TP7
       ],
-      // Umbral: TODAVÍA NO. Primero medimos, después elegimos el número.
+      // Umbral (TP5 §3.3/3.4): medimos 100% de líneas y de ramas. No ponemos 100 para no
+      // obligar a testear cada línea defensiva (Goodhart), pero sí cerca: si entra lógica
+      // nueva sin tests (~10 líneas en el back), el número cae abajo y el build se pone rojo.
+      // Funciones no tiene umbral: en el front, `traerReal` (el fetch real) queda sin test a propósito.
+      thresholds: { lines: 90, branches: 85 },
     },
   },
 });
