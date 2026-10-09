@@ -1,6 +1,7 @@
 import { useState, useTransition } from "react";
 import type { EventoVM, ParticipanteVM } from "../api";
 import { formatCurrency, formatDate } from "../format";
+import { contarPagos } from "../reglas";
 
 type Props = {
   evento: EventoVM;
@@ -20,9 +21,7 @@ export function EventoCard({ evento, onMarcarPago, onDesmarcarPago, onEximir, on
   );
   const [isPending, startTransition] = useTransition();
 
-  const relevantes = participantes.filter((p) => !p.exempt);
-  const pagaron = relevantes.filter((p) => pagos[p.eventParticipantId]).length;
-  const faltan = relevantes.length - pagaron;
+  const { pagaron, faltan } = contarPagos(participantes, pagos);
 
   const togglePago = (participante: ParticipanteVM) => {
     const nuevoEstado = !pagos[participante.eventParticipantId];

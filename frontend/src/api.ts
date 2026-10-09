@@ -45,30 +45,37 @@ export async function request<T>(traer: Traer, path: string, init?: RequestInit)
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
-// El cliente REAL, en un solo lugar (el equivalente del registro en Program.cs).
-// Arrow function y no `fetch` suelto: si fetch se llama como método de otro
-// objeto, el navegador tira "Illegal invocation".
-const traerReal: Traer = (url, init) => fetch(url, init);
-const llamar = <T>(path: string, init?: RequestInit) => request<T>(traerReal, path, init);
-
 const json = (method: string, body?: unknown): RequestInit => ({
   method,
   body: body === undefined ? undefined : JSON.stringify(body),
 });
 
-export const api = {
-  getDashboard: () => llamar<Dashboard>("/dashboard"),
+// Las rutas de cada endpoint. El cliente HTTP entra por parámetro (igual que en
+// `request`): en la app es el fetch real; en los tests, un vi.fn() que registra
+// qué URL y qué método se pidieron.
+export function crearApi(traer: Traer) {
+  const llamar = <T>(path: string, init?: RequestInit) => request<T>(traer, path, init);
 
-  getJugadoras: () => llamar<Jugadora[]>("/jugadoras"),
-  crearJugadora: (name: string) => llamar("/jugadoras", json("POST", { name })),
-  editarJugadora: (id: string, cambios: { name?: string; active?: boolean }) =>
-    llamar(`/jugadoras/${id}`, json("PATCH", cambios)),
+  return {
+    getDashboard: () => llamar<Dashboard>("/dashboard"),
 
-  getEventos: () => llamar<EventoVM[]>("/eventos"),
-  crearEvento: (evento: NuevoEvento) => llamar("/eventos", json("POST", evento)),
-  eliminarEvento: (id: string) => llamar(`/eventos/${id}`, json("DELETE")),
-  eximir: (eventId: string, playerId: string) => llamar(`/eventos/${eventId}/eximir/${playerId}`, json("POST")),
+    getJugadoras: () => llamar<Jugadora[]>("/jugadoras"),
+    crearJugadora: (name: string) => llamar("/jugadoras", json("POST", { name })),
+    editarJugadora: (id: string, cambios: { name?: string; active?: boolean }) =>
+      llamar(`/jugadoras/${id}`, json("PATCH", cambios)),
 
-  marcarPago: (participacionId: string) => llamar(`/participaciones/${participacionId}/pago`, json("PUT")),
-  desmarcarPago: (participacionId: string) => llamar(`/participaciones/${participacionId}/pago`, json("DELETE")),
-};
+    getEventos: () => llamar<EventoVM[]>("/eventos"),
+    crearEvento: (evento: NuevoEvento) => llamar("/eventos", json("POST", evento)),
+    eliminarEvento: (id: string) => llamar(`/eventos/${id}`, json("DELETE")),
+    eximir: (eventId: string, playerId: string) => llamar(`/eventos/${eventId}/eximir/${playerId}`, json("POST")),
+
+    marcarPago: (participacionId: string) => llamar(`/participaciones/${participacionId}/pago`, json("PUT")),
+    desmarcarPago: (participacionId: string) => llamar(`/participaciones/${participacionId}/pago`, json("DELETE")),
+  };
+}
+
+// El cliente REAL, en un solo lugar (el equivalente del registro en Program.cs).
+// Arrow function y no `fetch` suelto: si fetch se llama como método de otro
+// objeto, el navegador tira "Illegal invocation".
+const traerReal: Traer = (url, init) => fetch(url, init);
+export const api = crearApi(traerReal);

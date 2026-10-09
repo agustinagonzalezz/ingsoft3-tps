@@ -1,5 +1,6 @@
 import { useState, useTransition } from "react";
 import { formatCurrency } from "../format";
+import { nombreValido } from "../reglas";
 
 type Props = {
   name: string;
@@ -34,7 +35,7 @@ export function JugadoraRow({ name, active, deuda, onRenombrar, onToggleActiva }
               onChange={(e) => setNombre(e.target.value)}
               autoFocus
             />
-            <button type="submit" className="text-sm text-blue-600" disabled={isPending || !nombre.trim()}>
+            <button type="submit" className="text-sm text-blue-600" disabled={isPending || !nombreValido(nombre)}>
               Guardar
             </button>
             <button

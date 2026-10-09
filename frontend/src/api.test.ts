@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { request, type Traer } from "./api";
+import { crearApi, request, type Traer } from "./api";
 
 // Fabrica una respuesta HTTP falsa con lo único que `request` usa de Response:
 // ok, status y json(). Sin body, json() falla como falla con un body vacío.
@@ -65,5 +65,34 @@ describe("request", () => {
 
     expect(resultado).toBeUndefined();
     expect(json).not.toHaveBeenCalled(); // un 204 no tiene body: leerlo explotaría
+  });
+});
+
+// El contrato con el backend: cada método pide la ruta y el método HTTP correctos.
+// Si mañana alguien cambia una ruta sin querer, su fila se pone en rojo.
+describe("crearApi", () => {
+  const JSON_HEADERS = { "Content-Type": "application/json" };
+
+  it.each([
+    ["getDashboard", (a: ReturnType<typeof crearApi>) => a.getDashboard(), "/api/dashboard", undefined, undefined],
+    ["getJugadoras", (a: ReturnType<typeof crearApi>) => a.getJugadoras(), "/api/jugadoras", undefined, undefined],
+    ["crearJugadora", (a: ReturnType<typeof crearApi>) => a.crearJugadora("Ana"), "/api/jugadoras", "POST", '{"name":"Ana"}'],
+    ["editarJugadora", (a: ReturnType<typeof crearApi>) => a.editarJugadora("j1", { active: false }), "/api/jugadoras/j1", "PATCH", '{"active":false}'],
+    ["getEventos", (a: ReturnType<typeof crearApi>) => a.getEventos(), "/api/eventos", undefined, undefined],
+    ["crearEvento", (a: ReturnType<typeof crearApi>) => a.crearEvento({ name: "Cuota", type: "CUOTA", amount: 3000, dueDate: "2026-10-15" }), "/api/eventos", "POST", '{"name":"Cuota","type":"CUOTA","amount":3000,"dueDate":"2026-10-15"}'],
+    ["eliminarEvento", (a: ReturnType<typeof crearApi>) => a.eliminarEvento("e1"), "/api/eventos/e1", "DELETE", undefined],
+    ["eximir", (a: ReturnType<typeof crearApi>) => a.eximir("e1", "j1"), "/api/eventos/e1/eximir/j1", "POST", undefined],
+    ["marcarPago", (a: ReturnType<typeof crearApi>) => a.marcarPago("p1"), "/api/participaciones/p1/pago", "PUT", undefined],
+    ["desmarcarPago", (a: ReturnType<typeof crearApi>) => a.desmarcarPago("p1"), "/api/participaciones/p1/pago", "DELETE", undefined],
+  ])("%s pide su ruta y su método", async (_nombre, llamar, url, method, body) => {
+    const traer = vi.fn<Traer>().mockResolvedValue(respuesta(200, {}).res);
+
+    await llamar(crearApi(traer));
+
+    expect(traer).toHaveBeenCalledWith(url, {
+      ...(method && { method }),
+      ...(method && { body }),
+      headers: body ? JSON_HEADERS : undefined,
+    });
   });
 });
