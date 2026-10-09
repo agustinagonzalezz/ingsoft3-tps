@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
 import {
+  armarCambiosJugadora,
   calcularBalanceEquipo,
+  calcularPendienteEquipo,
   calcularDeudaJugadora,
+  deudaActual,
   eximirJugadora,
   jugadoraInactivaSinDeudaFutura,
   puedeEliminarEvento,
   validarMontoEvento,
+  validarNuevaJugadora,
   validarNuevoEvento,
   type Evento,
   type Jugadora,
@@ -192,5 +196,84 @@ describe("validarNuevoEvento", () => {
       ok: false,
       error: "Nombre y fecha de vencimiento son obligatorios",
     });
+  });
+});
+
+// ---- Deuda actual (regla 1 + regla 6) y pendiente del equipo (dashboard) ----
+describe("deudaActual y calcularPendienteEquipo", () => {
+  // e1 se creó el 1/2. j2 se desactivó el 15/1, ANTES de que existiera e1.
+  const activa = jugadora({ id: "j1" });
+  const inactiva = jugadora({ id: "j2", active: false, deactivatedAt: new Date("2026-01-15") });
+  const e1 = evento({ participants: [participante({ id: "p1", playerId: "j1" }), participante({ id: "p2", playerId: "j2" })] });
+  const pagos = [pago({ eventParticipantId: "p1", amount: 400 })];
+
+  it("una jugadora activa debe lo que le falta pagar", () => {
+    expect(deudaActual(activa, [e1], pagos)).toBe(600);
+  });
+
+  it("una inactiva no debe eventos creados después de su desactivación", () => {
+    expect(deudaActual(inactiva, [e1], pagos)).toBe(0);
+  });
+
+  it("el pendiente del equipo suma la deuda actual de todas (aplicando la regla 6)", () => {
+    // Sin la regla 6 daría 1600: los 1000 de j2 se sumarían aunque ya no juega.
+    expect(calcularPendienteEquipo([activa, inactiva], [e1], pagos)).toBe(600);
+  });
+
+  it("sin jugadoras el pendiente es 0", () => {
+    expect(calcularPendienteEquipo([], [e1], pagos)).toBe(0);
+  });
+});
+
+// ---- Alta y edición de jugadoras ----
+describe("validarNuevaJugadora", () => {
+  it("acepta un nombre y le saca los espacios de los costados", () => {
+    expect(validarNuevaJugadora({ name: "  Ana  " })).toEqual({ ok: true, name: "Ana" });
+  });
+
+  it.each([
+    ["vacío", { name: "" }],
+    ["de solo espacios", { name: "   " }],
+    ["ausente", {}],
+    ["sin body", undefined],
+  ])("rechaza un nombre %s", (_caso, body) => {
+    expect(validarNuevaJugadora(body)).toEqual({ ok: false, error: "El nombre es obligatorio" });
+  });
+});
+
+describe("armarCambiosJugadora", () => {
+  const AHORA = new Date("2026-10-09T12:00:00.000Z");
+
+  it("si solo viene el nombre, no toca el estado ni la fecha de desactivación", () => {
+    expect(armarCambiosJugadora({ name: " Ana " }, AHORA)).toEqual({ ok: true, cambios: { name: "Ana" } });
+  });
+
+  it("no deja el nombre vacío", () => {
+    expect(armarCambiosJugadora({ name: "  " }, AHORA)).toEqual({
+      ok: false,
+      error: "El nombre no puede quedar vacío",
+    });
+  });
+
+  it("al desactivar guarda la fecha (la que usa la regla 6)", () => {
+    expect(armarCambiosJugadora({ active: false }, AHORA)).toEqual({
+      ok: true,
+      cambios: { active: false, deactivatedAt: AHORA },
+    });
+  });
+
+  it("al reactivar borra la fecha de desactivación", () => {
+    expect(armarCambiosJugadora({ active: true }, AHORA)).toEqual({
+      ok: true,
+      cambios: { active: true, deactivatedAt: null },
+    });
+  });
+
+  it("con un body vacío no cambia nada", () => {
+    expect(armarCambiosJugadora({}, AHORA)).toEqual({ ok: true, cambios: {} });
+  });
+
+  it("sin body no explota (Express 5 deja req.body undefined si no viene JSON)", () => {
+    expect(armarCambiosJugadora(undefined, AHORA)).toEqual({ ok: true, cambios: {} });
   });
 });

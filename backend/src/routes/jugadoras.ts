@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import { calcularDeudaJugadora, jugadoraInactivaSinDeudaFutura } from "../rules.js";
+import { armarCambiosJugadora, deudaActual, validarNuevaJugadora } from "../rules.js";
 import { toEvento, toPago } from "../mappers.js";
 
 export const jugadorasRouter = Router();
@@ -20,42 +20,30 @@ jugadorasRouter.get("/", async (_req, res) => {
       id: j.id,
       name: j.name,
       active: j.active,
-      deuda: calcularDeudaJugadora(j, jugadoraInactivaSinDeudaFutura(j, eventosNum), pagosNum),
+      deuda: deudaActual(j, eventosNum, pagosNum),
     }))
   );
 });
 
 // POST /api/jugadoras { name }
 jugadorasRouter.post("/", async (req, res) => {
-  const name = String(req.body?.name ?? "").trim();
-  if (!name) {
-    res.status(400).json({ error: "El nombre es obligatorio" });
+  const validacion = validarNuevaJugadora(req.body);
+  if (!validacion.ok) {
+    res.status(400).json({ error: validacion.error });
     return;
   }
-  const jugadora = await db.player.create({ data: { name } });
+  const jugadora = await db.player.create({ data: { name: validacion.name } });
   res.status(201).json(jugadora);
 });
 
 // PATCH /api/jugadoras/:id { name?, active? }
+// Qué se cambia (y la fecha de desactivación) lo decide rules.ts; acá se traduce y se guarda.
 jugadorasRouter.patch("/:id", async (req, res) => {
-  const { name, active } = req.body ?? {};
-  const data: { name?: string; active?: boolean; deactivatedAt?: Date | null } = {};
-
-  if (name !== undefined) {
-    const trimmed = String(name).trim();
-    if (!trimmed) {
-      res.status(400).json({ error: "El nombre no puede quedar vacío" });
-      return;
-    }
-    data.name = trimmed;
+  const resultado = armarCambiosJugadora(req.body, new Date());
+  if (!resultado.ok) {
+    res.status(400).json({ error: resultado.error });
+    return;
   }
-  if (active !== undefined) {
-    data.active = Boolean(active);
-    // Al desactivar se guarda deactivatedAt: lo usa la regla
-    // "jugadoraInactivaSinDeudaFutura" para no sumarle eventos futuros.
-    data.deactivatedAt = data.active ? null : new Date();
-  }
-
-  const jugadora = await db.player.update({ where: { id: req.params.id }, data });
+  const jugadora = await db.player.update({ where: { id: req.params.id }, data: resultado.cambios });
   res.json(jugadora);
 });

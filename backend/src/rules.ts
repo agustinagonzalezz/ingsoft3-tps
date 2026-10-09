@@ -178,3 +178,52 @@ export function validarNuevoEvento(body: unknown): ValidacionEvento {
   }
   return { ok: true, datos: { name, type: type as EventType, amount, dueDate: new Date(dueDate) } };
 }
+
+/**
+ * Deuda actual de una jugadora: la regla 1 aplicada solo sobre los eventos que
+ * le corresponden según la regla 6. Antes esta composición estaba repetida en
+ * GET /api/jugadoras y en GET /api/dashboard.
+ */
+export function deudaActual(player: Jugadora, events: Evento[], payments: Pago[]): number {
+  return calcularDeudaJugadora(player, jugadoraInactivaSinDeudaFutura(player, events), payments);
+}
+
+/** Pendiente del equipo (dashboard): la suma de la deuda actual de todas las jugadoras. */
+export function calcularPendienteEquipo(players: Jugadora[], events: Evento[], payments: Pago[]): number {
+  return players.reduce((acc, j) => acc + deudaActual(j, events, payments), 0);
+}
+
+/** Alta de jugadora (antes en POST /api/jugadoras): el nombre es obligatorio. */
+export function validarNuevaJugadora(body: unknown): { ok: true; name: string } | { ok: false; error: string } {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const name = String(b.name ?? "").trim();
+  if (!name) return { ok: false, error: "El nombre es obligatorio" };
+  return { ok: true, name };
+}
+
+export type CambiosJugadora = { name?: string; active?: boolean; deactivatedAt?: Date | null };
+
+/**
+ * Edición de jugadora (antes en PATCH /api/jugadoras/:id): solo cambia lo que
+ * viene en el body. Al desactivar guarda la fecha (la usa la regla 6) y al
+ * reactivar la borra. `ahora` entra por parámetro para poder testear la fecha
+ * sin depender del reloj.
+ */
+export function armarCambiosJugadora(
+  body: unknown,
+  ahora: Date
+): { ok: true; cambios: CambiosJugadora } | { ok: false; error: string } {
+  const { name, active } = (body ?? {}) as Record<string, unknown>;
+  const cambios: CambiosJugadora = {};
+
+  if (name !== undefined) {
+    const nombre = String(name).trim();
+    if (!nombre) return { ok: false, error: "El nombre no puede quedar vacío" };
+    cambios.name = nombre;
+  }
+  if (active !== undefined) {
+    cambios.active = Boolean(active);
+    cambios.deactivatedAt = cambios.active ? null : ahora;
+  }
+  return { ok: true, cambios };
+}
