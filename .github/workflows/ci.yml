@@ -36,3 +36,62 @@ jobs:
           tags: ingsoft3-tps-${{ matrix.componente }}:ci
           cache-from: type=gha,scope=${{ matrix.componente }}
           cache-to: type=gha,mode=max,scope=${{ matrix.componente }}
+
+      # ---- TP5: tests + coverage, en el MISMO job (los required checks no cambian) ----
+      # Cuatro estantes de cache: backend, frontend, backend-test y frontend-test.
+      - name: Construir la etapa de tests (${{ matrix.componente }})
+        uses: docker/build-push-action@v7
+        with:
+          context: ./${{ matrix.componente }}
+          target: test # se detiene en la etapa test, no llega a runtime
+          load: true # baja la imagen al Docker del runner para poder hacer docker run
+          push: false
+          tags: ${{ matrix.componente }}-test:ci
+          cache-from: type=gha,scope=${{ matrix.componente }}-test
+          cache-to: type=gha,mode=max,scope=${{ matrix.componente }}-test
+
+      - name: Correr los tests con coverage (${{ matrix.componente }})
+        env:
+          COMPONENTE: ${{ matrix.componente }}
+        # El ENTRYPOINT de la etapa corre `npm run test:ci`. COVERAGE_DIR le dice a vitest
+        # dónde dejar el reporte: /out/coverage, una SUBcarpeta del volumen (vitest borra
+        # esa carpeta antes de escribir, y el punto de montaje no se puede borrar).
+        run: |
+          mkdir -p reportes
+          docker run --rm \
+            -e COVERAGE_DIR=/out/coverage \
+            -v "${{ github.workspace }}/reportes:/out" \
+            "$COMPONENTE-test:ci"
+
+      - name: Resumen de coverage (${{ matrix.componente }})
+        if: ${{ !cancelled() }} # también si los tests fallaron: es cuando más se quiere ver
+        env:
+          COMPONENTE: ${{ matrix.componente }}
+        run: |
+          RESUMEN=reportes/coverage/coverage-summary.json
+          # Sin reporte, o con un reporte que no midió nada, el paso falla: un 0/0
+          # no es "todo cubierto", es que la medición no corrió.
+          if [ ! -f "$RESUMEN" ]; then
+            echo "::error::No se generó $RESUMEN"
+            exit 1
+          fi
+          if ! jq -e '.total.lines.total > 0' "$RESUMEN" > /dev/null; then
+            echo "::error::El reporte de coverage no midió ninguna línea"
+            exit 1
+          fi
+          {
+            echo "### Coverage · $COMPONENTE"
+            echo ""
+            echo "| Métrica | Cubiertas | Total | % |"
+            echo "|---|---|---|---|"
+            jq -r '.total as $t
+              | [["Líneas","lines"],["Ramas","branches"],["Funciones","functions"],["Sentencias","statements"]][]
+              | "| \(.[0]) | \($t[.[1]].covered) | \($t[.[1]].total) | \($t[.[1]].pct) % |"' "$RESUMEN"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar el reporte (${{ matrix.componente }})
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-${{ matrix.componente }} # un nombre por componente: en la matriz no se pueden repetir
+          path: reportes/coverage
