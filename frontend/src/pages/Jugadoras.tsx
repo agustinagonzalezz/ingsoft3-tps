@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useApi } from "../useApi";
 import { JugadoraRow } from "../components/JugadoraRow";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { mensajeDeError, nombreValido } from "../reglas";
 
 export function JugadorasPage() {
   const { data: jugadoras, error, recargar } = useApi(api.getJugadoras);
@@ -15,7 +16,7 @@ export function JugadorasPage() {
       await accion();
       setErrorAccion(null);
     } catch (e) {
-      setErrorAccion(e instanceof Error ? e.message : String(e));
+      setErrorAccion(mensajeDeError(e));
     }
     await recargar();
   };
@@ -45,7 +46,7 @@ export function JugadorasPage() {
         />
         <button
           type="submit"
-          disabled={nombre.trim().length === 0}
+          disabled={!nombreValido(nombre)}
           className="rounded bg-zinc-900 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           Agregar

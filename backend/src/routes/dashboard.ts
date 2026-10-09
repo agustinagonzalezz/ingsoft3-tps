@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import { calcularBalanceEquipo, calcularDeudaJugadora, jugadoraInactivaSinDeudaFutura } from "../rules.js";
+import { calcularBalanceEquipo, calcularPendienteEquipo } from "../rules.js";
 import { toEvento, toGasto, toPago } from "../mappers.js";
 
 export const dashboardRouter = Router();
@@ -17,10 +17,7 @@ dashboardRouter.get("/", async (_req, res) => {
   const pagosNum = pagos.map(toPago);
 
   const { recaudado, gastos: gastado, balance } = calcularBalanceEquipo(eventosNum, pagosNum, gastos.map(toGasto));
-  const pendiente = jugadoras.reduce(
-    (acc, j) => acc + calcularDeudaJugadora(j, jugadoraInactivaSinDeudaFutura(j, eventosNum), pagosNum),
-    0
-  );
+  const pendiente = calcularPendienteEquipo(jugadoras, eventosNum, pagosNum);
 
   res.json({ recaudado, pendiente, gastos: gastado, balance });
 });

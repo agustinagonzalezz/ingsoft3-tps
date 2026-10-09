@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { mensajeDeError } from "./reglas";
 
 // Hook mínimo para cargar datos de la API: estado de carga, error y una
 // función `recargar` para volver a pedir después de una escritura
@@ -12,7 +13,7 @@ export function useApi<T>(fetcher: () => Promise<T>) {
       setData(await fetcher());
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(mensajeDeError(e));
     }
   }, [fetcher]);
 

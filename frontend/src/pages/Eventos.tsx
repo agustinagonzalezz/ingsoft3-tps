@@ -4,6 +4,7 @@ import { useApi } from "../useApi";
 import { EventoForm } from "../components/EventoForm";
 import { EventoCard } from "../components/EventoCard";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { mensajeDeError } from "../reglas";
 
 export function EventosPage() {
   const { data: eventos, error, recargar } = useApi(api.getEventos);
@@ -14,7 +15,7 @@ export function EventosPage() {
       await accion();
       setErrorAccion(null);
     } catch (e) {
-      setErrorAccion(e instanceof Error ? e.message : String(e));
+      setErrorAccion(mensajeDeError(e));
     }
     await recargar();
   };

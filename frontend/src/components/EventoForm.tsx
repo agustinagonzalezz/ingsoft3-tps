@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { EventType, NuevoEvento } from "../api";
+import { puedeCrearEvento } from "../reglas";
 
 const TIPOS: { value: EventType; label: string }[] = [
   { value: "CUOTA", label: "Cuota" },
@@ -16,10 +17,8 @@ export function EventoForm({ onCrear }: Props) {
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  // Regla de frontend: no se puede enviar si falta el nombre o el monto no es > 0.
-  // (El backend vuelve a validar: esto es UX, no seguridad.)
-  const montoValido = Number(amount) > 0;
-  const disabled = name.trim().length === 0 || !montoValido || !dueDate;
+  // La regla vive en reglas.ts (testeada); el backend vuelve a validar.
+  const disabled = !puedeCrearEvento(name, amount, dueDate);
 
   return (
     <form
