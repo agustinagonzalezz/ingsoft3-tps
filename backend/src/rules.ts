@@ -227,3 +227,36 @@ export function armarCambiosJugadora(
   }
   return { ok: true, cambios };
 }
+
+export type EstadoEvento = "sin-participantes" | "cobrado" | "vencido" | "vence-pronto" | "pendiente";
+
+/**
+ * Estado de cobro de un evento, para mostrarlo en la lista:
+ * - sin-participantes: nadie tiene que pagarlo.
+ * - cobrado: todas las participantes no exentas tienen al menos un pago.
+ * - vencido: falta cobrar y la fecha de vencimiento ya pasó.
+ * - vence-pronto: falta cobrar y vence dentro de los próximos 3 días.
+ * - pendiente: falta cobrar y todavía hay tiempo.
+ * `ahora` entra por parámetro para no depender del reloj.
+ */
+export function estadoDeEvento(event: Evento, payments: Pago[], ahora: Date): EstadoEvento {
+  const deben = event.participants.filter((p) => !p.exempt);
+  if (deben.length === 0) {
+    return "sin-participantes";
+  }
+
+  const pagaron = new Set(payments.map((pago) => pago.eventParticipantId));
+  const faltan = deben.filter((p) => !pagaron.has(p.id));
+  if (faltan.length === 0) {
+    return "cobrado";
+  }
+
+  const diasParaVencer = (event.dueDate.getTime() - ahora.getTime()) / 86_400_000;
+  if (diasParaVencer < 0) {
+    return "vencido";
+  }
+  if (diasParaVencer <= 3) {
+    return "vence-pronto";
+  }
+  return "pendiente";
+}
