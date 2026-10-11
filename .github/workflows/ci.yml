@@ -16,6 +16,11 @@ jobs:
         componente: [backend, frontend]
     name: build (${{ matrix.componente }})
     runs-on: ubuntu-latest
+    # TP6: permiso para publicar en ghcr.io. Va en el job (no arriba de todo): mínimo privilegio.
+    # Lo que no se lista queda sin permiso, por eso contents: read (lo necesita el checkout).
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Qué estamos verificando
         env:
@@ -27,15 +32,6 @@ jobs:
 
       - name: Preparar el constructor que sabe cachear
         uses: docker/setup-buildx-action@v4
-
-      - name: Construir la imagen (${{ matrix.componente }})
-        uses: docker/build-push-action@v7
-        with:
-          context: ./${{ matrix.componente }}
-          push: false
-          tags: ingsoft3-tps-${{ matrix.componente }}:ci
-          cache-from: type=gha,scope=${{ matrix.componente }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.componente }}
 
       # ---- TP5: tests + coverage, en el MISMO job (los required checks no cambian) ----
       # Cuatro estantes de cache: backend, frontend, backend-test y frontend-test.
@@ -95,3 +91,24 @@ jobs:
         with:
           name: coverage-${{ matrix.componente }} # un nombre por componente: en la matriz no se pueden repetir
           path: reportes/coverage
+
+      # ---- TP6: publicar el artefacto. Estos dos pasos son los ÚLTIMOS del job, a propósito ----
+      # No llevan !cancelled() ni always(): si los tests fallaron, el job ya murió y no llegan a correr.
+      - name: Entrar al registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # token propio de la corrida, no hace falta secret nuevo
+
+      # El build final (el del TP4) se mudó acá abajo: antes estaba ANTES de los tests.
+      # Publica sólo en un push a main (las dos condiciones, no una). En los PRs construye igual pero no sube.
+      - name: Construir y publicar la imagen (${{ matrix.componente }})
+        uses: docker/build-push-action@v7
+        with:
+          context: ./${{ matrix.componente }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ghcr.io/${{ github.repository }}-${{ matrix.componente }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.componente }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.componente }}
