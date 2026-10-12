@@ -17,6 +17,10 @@ ENTRYPOINT ["npm", "run", "test:ci"]
 
 # ---- Etapa 3: runtime (solo nginx + archivos estáticos; Node no viaja) ----
 FROM mirror.gcr.io/library/nginx:1.29-alpine AS runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# TP6: la config va como PLANTILLA en templates/ (no en conf.d/): nginx la completa al arrancar
+# con las variables de entorno. Los valores de abajo son los de compose; Render los pisa.
+COPY default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
+ENV BACKEND_URL=http://backend:8080 \
+    DNS_RESOLVER=127.0.0.11
 EXPOSE 80
