@@ -1,0 +1,36 @@
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # TP6: la dirección del backend y el DNS llegan por VARIABLES DE ENTORNO, no escritas acá.
+    # La imagen oficial de nginx, al arrancar, toma este archivo de /etc/nginx/templates/,
+    # reemplaza ${BACKEND_URL} y ${DNS_RESOLVER} por sus valores y lo deja en conf.d/.
+    #   - en compose: http://backend:8080 y el DNS interno de Docker (127.0.0.11), los valores por defecto del Dockerfile
+    #   - en Render:  la URL https de la api de ESTE entorno (QA o PROD) y un DNS público
+    # Así la MISMA imagen sirve en QA y en PROD: cambia la variable, no la imagen.
+    #
+    # El resolver + la variable hacen que nginx busque la dirección del backend RECIÉN cuando llega
+    # un pedido, y no al arrancar. Con un nombre escrito fijo, si al arrancar no lo encuentra
+    # ("host not found in upstream"), nginx se cae con exit 1: fue lo que pasó en el primer deploy en Render.
+    resolver ${DNS_RESOLVER} valid=10s ipv6=off;
+    set $backend_api ${BACKEND_URL};
+
+    # Todo lo que llegue a /api se reenvía al backend. El browser nunca ve al backend:
+    # para él, front y API son el mismo origen (sin CORS).
+    location /api/ {
+        proxy_pass $backend_api;
+        # La api de Render es https: sin esto el TLS no sabe a qué host va.
+        proxy_ssl_server_name on;
+        # Ojo: NO se pisa el header Host. Render elige a qué servicio mandar el pedido mirando
+        # el Host, así que tiene que llegar el de la api, no el del front.
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # SPA: si la ruta no es un archivo (ej: /jugadoras), devolver index.html
+    # y que React Router resuelva del lado del browser.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
