@@ -10,9 +10,13 @@ export function createApp() {
   const app = express();
   app.use(express.json());
 
-  // Healthcheck para compose (y más adelante para el deploy del TP6).
+  // Healthcheck para compose y para el smoke test del deploy (TP6).
+  // `commit`: qué commit está corriendo. Render le pasa RENDER_GIT_COMMIT a cada deploy;
+  // el smoke lo compara con el commit que verificó el pipeline. Sin esto, mientras Render
+  // construye la versión nueva sigue sirviendo la vieja, y el smoke daría verde contra ésa.
+  // En compose no existe la variable: devuelve "local".
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", commit: process.env.RENDER_GIT_COMMIT ?? "local" });
   });
 
   app.use("/api/jugadoras", jugadorasRouter);
