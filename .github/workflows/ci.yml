@@ -178,3 +178,68 @@ jobs:
           done
           echo "::error::QA no respondió con el commit $GITHUB_SHA a tiempo"
           exit 1
+
+  # ==== TP6 §3.4: el gate humano. PROD sólo después de QA vivo Y de una aprobación ====
+  deploy-prod:
+    name: deploy (production)
+    runs-on: ubuntu-latest
+    # Sin `if` de rama, a propósito: depende de deploy-qa, que sí lo tiene. En un PR deploy-qa
+    # sale salteado y entonces éste también: la condición se hereda por la cadena.
+    needs: deploy-qa
+    # ⏸ El workflow SE PAUSA acá ("Waiting for review") hasta que el required reviewer del
+    # environment apruebe. Recién ahí el job arranca y puede leer los secrets de production.
+    environment: production
+    # Dos deploys a PROD nunca a la vez. OJO: no ordena la cola de aprobaciones; si quedan dos
+    # corridas esperando, la vieja se rechaza a mano (aprobarla haría retroceder PROD).
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      # Acá el &ref= importa más que en QA: entre que la corrida queda esperando y que alguien
+      # aprueba pueden pasar horas, y main se mueve. Con &ref sube a PROD el commit que se
+      # aprobó (el mismo que pasó por QA), no lo último que haya en main.
+      - name: Disparar el deploy en Render (backend + front) del commit aprobado
+        env:
+          HOOK_API: ${{ secrets.RENDER_HOOK_API_PROD }}
+          HOOK_FRONT: ${{ secrets.RENDER_HOOK_FRONT_PROD }}
+        run: |
+          disparar() {
+            local nombre="$1" hook="$2"
+            if [ -z "$hook" ]; then
+              echo "::error::$nombre está vacío (no existe en el environment production)"; return 1
+            fi
+            if [[ "$hook" =~ [[:space:]] ]]; then
+              echo "::error::$nombre tiene espacios o saltos de línea (largo ${#hook})"; return 1
+            fi
+            if [[ "$hook" != https://api.render.com/deploy/srv-*\?key=* ]]; then
+              echo "::error::$nombre no tiene la forma https://api.render.com/deploy/srv-…?key=… (largo ${#hook})"; return 1
+            fi
+            curl -fsS --max-time 30 -o /dev/null "$hook&ref=$GITHUB_SHA"
+            echo "✅ $nombre: deploy pedido a Render para el commit $GITHUB_SHA"
+          }
+          disparar RENDER_HOOK_API_PROD "$HOOK_API"
+          disparar RENDER_HOOK_FRONT_PROD "$HOOK_FRONT"
+
+      - name: Smoke test (espera a que PROD conteste con ESTE commit)
+        shell: bash
+        env:
+          URL_API: https://teampay-api-prod.onrender.com
+          URL_FRONT: https://teampay-front-prod.onrender.com
+        run: |
+          echo "Esperando a que PROD corra el commit $GITHUB_SHA..."
+          for i in $(seq 1 30); do
+            COMMIT=$(curl -fsS --max-time 10 "$URL_API/api/health" | jq -r '.commit' || true)
+            if [ "$COMMIT" = "$GITHUB_SHA" ] \
+               && curl -fsS --max-time 10 "$URL_API/api/jugadoras" > /dev/null \
+               && curl -fsS --max-time 10 "$URL_FRONT/api/health" > /dev/null \
+               && curl -fsS --max-time 10 "$URL_FRONT/" > /dev/null; then
+              echo "✅ PROD responde con el commit aprobado: api + base + front (y el front llega a su api)"
+              exit 0
+            fi
+            echo "Intento $i/30: la api dice commit '${COMMIT:-sin respuesta}'. Reintento en 20 s"
+            sleep 20
+          done
+          echo "::error::PROD no respondió con el commit $GITHUB_SHA a tiempo"
+          exit 1
