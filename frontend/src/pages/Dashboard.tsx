@@ -20,7 +20,7 @@ export function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-zinc-600">Balance general del equipo.</p>
+        <p className="text-sm text-zinc-600">Balance general del equipo: lo cobrado, lo que falta cobrar y los gastos.</p>
       </div>
 
       <ErrorBanner message={error} />
