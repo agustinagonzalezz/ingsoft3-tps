@@ -406,7 +406,20 @@ Usé el riel de la guía: **Render** para correr los contenedores y **Neon** par
 
 **Las tablas.** Las dos bases nacen vacías. Mi `docker-entrypoint.sh` corre `prisma migrate deploy` antes de levantar la API, así que las tablas se crearon solas la primera vez que cada api arrancó en Render. Lo comprobé en el SQL Editor de Neon con `SELECT count(*) FROM "Player";` en las dos bases: antes daba *relation does not exist*, después dio 0. (Con comillas y mayúscula: Prisma crea las tablas con el nombre del modelo.)
 
-**Cómo compruebo que cada entorno usa su propia base.** Las dos `DATABASE_URL` difieren en una sola palabra (`app_qa` / `app_prod`), y si las cruzo nada se pone rojo: PROD funcionaría escribiendo en la base de QA. Para comprobarlo creo un dato con un nombre inconfundible **sólo en `app_prod`** desde el SQL Editor de Neon, lo busco en el front de PROD (tiene que aparecer) y en el de QA (no tiene que aparecer).
+**Cómo comprobé que cada entorno usa su propia base.** Las dos `DATABASE_URL` difieren en una sola palabra (`app_qa` / `app_prod`), y si las cruzo nada se pone rojo: PROD funcionaría escribiendo en la base de QA. Mirar las variables en Render no alcanza; hay que probarlo con un dato. Desde el SQL Editor de Neon, con **`app_prod`** seleccionada, creé una jugadora con un nombre inconfundible:
+
+```sql
+INSERT INTO "Player" ("id", "name") VALUES ('solo-prod-1', 'SOY PROD');
+```
+
+(El `id` va a mano porque en mi tabla lo genera Prisma desde el código, no la base.) Después le pregunté a cada api:
+
+| | `GET /api/jugadoras` |
+|---|---|
+| PROD | `[{"id":"solo-prod-1","name":"SOY PROD",…}]`: aparece |
+| QA | `[{"id":"cmv8…","name":"AGUSTINA GONZALEZ ALONSO",…}]`: **no** aparece (sólo la jugadora que creé desde el front de QA en las pruebas) |
+
+Cada api lee de su base. Dejé `SOY PROD` en PROD para poder repetir la prueba en vivo.
 
 ### Qué quedó por variable y qué quedó adentro de la imagen
 | Por variable de entorno (cambia por entorno) | Adentro de la imagen (igual en QA y PROD) |
