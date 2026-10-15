@@ -14,7 +14,7 @@ export function App() {
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-4xl items-center gap-6 px-4 py-3">
-          <span className="font-semibold">tp-inge3</span>
+          <span className="font-semibold">TeamPay mini</span>
           <nav className="flex gap-4 text-sm">
             {NAV_LINKS.map((link) => (
               <NavLink
