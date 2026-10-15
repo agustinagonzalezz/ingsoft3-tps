@@ -2,7 +2,7 @@
 
 Lo que no se encuentra navegando el repo:
 
-**(a) Los dos paquetes públicos**, etiquetados con el commit del merge que llegó a PROD en la `v6.0.0` (`4cfaaeb`). Se bajan sin credenciales:
+**(a) Los dos paquetes públicos**, etiquetados con el commit de un merge: `4cfaaeb` (PR #34, el primer cambio que aprobé hacia PROD). Se bajan sin credenciales:
 
 ```bash
 docker pull ghcr.io/agustinagonzalezz/ingsoft3-tps-backend:sha-4cfaaeb179522cfa67639cca2aeb48aa2fcf36e4
@@ -496,7 +496,9 @@ Me equivoqué dos veces con los comentarios de aprobación: en una pegué el eje
 Mi pipeline publica la imagen que pasó los tests, pero **Render no la usa**: el hook le pide que vuelva a construir ese commit desde el repositorio. Entonces promuevo **el mismo commit**, pero no **la misma imagen**. Lo que corre en QA y en PROD es otra construcción del mismo código, y podría salir distinta: una dependencia que se resolvió diferente, una imagen base (`node:22-alpine`, `nginx:1.29-alpine`) que se actualizó entre un build y otro. Además, QA y PROD son **dos construcciones distintas** entre sí: lo que probé en QA no es, literalmente, lo que corre en PROD. Es exactamente lo que resuelve el TP7, desplegando la imagen del registry.
 
 ### Release
-La llegada a PROD quedó etiquetada como **`v6.0.0`** y publicada como Release de GitHub con notas generadas desde los PRs #29 a #34. El tag apunta a `4cfaaeb`, el commit que corría en PROD según *Deployments*, **no** a la punta de `main`: entre la aprobación y el tag podría haber entrado otro merge que nadie aprobó. El número no lo elegí: `v6.0.0` es la marca de cierre del TP6 (no es SemVer).
+La llegada a PROD quedó etiquetada como **`v6.0.0`** y publicada como Release de GitHub con notas generadas desde los PRs. El tag apunta al commit que corre en PROD **según *Deployments***, no a la punta de `main`: entre la aprobación y el tag podría haber entrado otro merge que nadie aprobó. El número no lo elegí: `v6.0.0` es la marca de cierre del TP6 (no es SemVer).
+
+Primero puse `v6.0.0` en `4cfaaeb` (PR #34), que era lo que había llegado a PROD. Pero en ese commit todavía no estaba esta sección de `decisiones.md`, así que haciendo `git checkout v6.0.0` no se veía. Por eso, después de mergear este archivo, aprobé ese deploy a PROD y **moví el tag** a ese commit (borré la release y el tag y los volví a crear). Así `v6.0.0` sigue siendo exactamente lo que corre en PROD, y además trae la documentación completa.
 
 ### Deployment pattern para una producción real: blue-green
 Hoy Render hace *recreate*: construye la versión nueva y recién cuando está lista cambia el tráfico. Para TeamPay con usuarios reales elegiría **blue-green**:
@@ -510,13 +512,13 @@ Lo combinaría con **feature flags** para las funciones nuevas: desplegar el có
 
 ### Plan de rollback actual (medido)
 Si el deploy aprobado sale mal:
-1. Busco el último commit bueno: el de la release anterior (`git rev-list -n1 v6.0.0`) o el anterior en *Deployments → production*.
+1. Busco el último commit bueno: el de la última release (`git rev-list -n1 v6.0.0`) o el anterior en *Deployments → production*.
 2. Copio los dos deploy hooks de PROD de Render (los secrets de GitHub no se pueden volver a leer) y los cargo en PowerShell con `Read-Host -AsSecureString`, para que no queden ni en pantalla ni en el historial.
 3. Anoto la hora y llamo a los dos hooks con `&ref=<commit bueno>`.
 4. Espero a que Render → *Deploys* muestre ese commit **Live** en los dos servicios. No me guío por `/health` ni por la página, porque mientras Render construye sigue sirviendo la versión mala.
 5. Compruebo el front de PROD (con Ctrl+F5, porque el navegador guarda el `index.html` viejo).
 
-**Lo medí una vez, de verdad.** Llevé a PROD un cambio visible (el subtítulo del Dashboard, commit `c7f479f`) y volví a `v6.0.0` (`4cfaaeb`):
+**Lo medí una vez, de verdad.** Llevé a PROD un cambio visible (el subtítulo del Dashboard, commit `c7f479f`) y volví a `4cfaaeb`, que en ese momento era la release `v6.0.0`:
 
 | | Hora |
 |---|---|
