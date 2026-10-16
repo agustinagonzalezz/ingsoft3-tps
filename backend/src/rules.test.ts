@@ -10,6 +10,7 @@ import {
   jugadoraInactivaSinDeudaFutura,
   puedeEliminarEvento,
   validarMontoEvento,
+  MONTO_MAXIMO,
   validarNuevaJugadora,
   validarNuevoEvento,
   type Evento,
@@ -188,8 +189,13 @@ describe("validarNuevoEvento", () => {
     ["con monto 0", { amount: 0 }, "El monto debe ser mayor a 0"],
     ["con monto negativo", { amount: -100 }, "El monto debe ser mayor a 0"],
     ["con monto no numérico", { amount: "abc" }, "El monto debe ser mayor a 0"],
+    ["con un monto que no entra en la base", { amount: 100_000_000 }, "El monto no puede superar $ 99.999.999,99"],
   ])("rechaza un evento %s", (_caso, cambio, error) => {
     expect(validarNuevoEvento({ ...valido, ...cambio })).toEqual({ ok: false, error });
+  });
+
+  it("acepta el monto máximo que guarda la base (borde)", () => {
+    expect(validarNuevoEvento({ ...valido, amount: MONTO_MAXIMO }).ok).toBe(true);
   });
 
   it("sin body no explota: pide nombre y fecha", () => {

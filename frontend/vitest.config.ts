@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 // Tests sin DOM: la lógica que estaba en los componentes se sacó a reglas.ts.
 export default defineConfig({
   test: {
+    // Sólo src/**/*.test.ts: los specs de Playwright (e2e/*.spec.ts) quedan afuera solos. Cada
+    // runner con su carpeta: si vitest los agarrara, explotaría y pondría rojo el build (TP7 §3.3).
     include: ["src/**/*.test.ts"],
     coverage: {
       provider: "v8",

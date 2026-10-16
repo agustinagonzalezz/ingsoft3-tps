@@ -11,6 +11,11 @@ backend/src/generated/
 .env*
 !.env.example
 
+# TP7: lo que genera Playwright en cada corrida (y los reportes bajados con gh run download)
+playwright-report/
+test-results/
+reporte-*/
+
 # misc
 .DS_Store
 npm-debug.log*

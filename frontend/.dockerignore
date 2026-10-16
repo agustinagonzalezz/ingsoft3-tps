@@ -5,3 +5,8 @@ npm-debug.log*
 Dockerfile
 .dockerignore
 coverage
+# TP7: las pruebas de Playwright no viajan en la imagen (corren desde el runner contra QA)
+e2e
+playwright.config.ts
+playwright-report
+test-results

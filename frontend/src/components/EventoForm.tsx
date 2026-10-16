@@ -21,6 +21,8 @@ export function EventoForm({ onCrear }: Props) {
   const disabled = !puedeCrearEvento(name, amount, dueDate);
 
   return (
+    // TP7: cada control lleva su aria-label (el nombre que lee un lector de pantalla). Con
+    // el placeholder solo, el campo no tiene nombre accesible, y las e2e lo buscan por ahí.
     <form
       onSubmit={async (e) => {
         e.preventDefault();
@@ -33,6 +35,7 @@ export function EventoForm({ onCrear }: Props) {
     >
       <input
         name="name"
+        aria-label="Nombre del evento"
         placeholder="Nombre del evento"
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -41,6 +44,7 @@ export function EventoForm({ onCrear }: Props) {
       />
       <select
         name="type"
+        aria-label="Tipo de evento"
         value={type}
         onChange={(e) => setType(e.target.value as EventType)}
         className="rounded border border-zinc-300 px-3 py-1.5 text-sm"
@@ -53,6 +57,7 @@ export function EventoForm({ onCrear }: Props) {
       </select>
       <input
         name="amount"
+        aria-label="Monto"
         type="number"
         step="0.01"
         placeholder="Monto"
@@ -63,6 +68,7 @@ export function EventoForm({ onCrear }: Props) {
       />
       <input
         name="dueDate"
+        aria-label="Fecha de vencimiento"
         type="date"
         value={dueDate}
         onChange={(e) => setDueDate(e.target.value)}
