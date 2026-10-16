@@ -11,12 +11,14 @@ export function createApp() {
   app.use(express.json());
 
   // Healthcheck para compose y para el smoke test del deploy (TP6).
-  // `commit`: qué commit está corriendo. Render le pasa RENDER_GIT_COMMIT a cada deploy;
-  // el smoke lo compara con el commit que verificó el pipeline. Sin esto, mientras Render
-  // construye la versión nueva sigue sirviendo la vieja, y el smoke daría verde contra ésa.
-  // En compose no existe la variable: devuelve "local".
+  // `commit`: de qué commit salió la IMAGEN que está corriendo (TP7). El pipeline lo hornea
+  // al construirla (build-arg GIT_COMMIT -> ENV en el Dockerfile), así que viaja adentro de la
+  // imagen a QA y a PROD. El smoke lo compara con el commit de la corrida: si el deploy falló,
+  // Render sigue sirviendo la imagen vieja, y sin esto el smoke daría verde contra ésa.
+  // (En el TP6 salía de RENDER_GIT_COMMIT, que Render sólo pone cuando construye desde el repo.)
+  // Una imagen construida a mano, sin el build-arg, devuelve "local".
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", commit: process.env.RENDER_GIT_COMMIT ?? "local" });
+    res.json({ status: "ok", commit: process.env.GIT_COMMIT || "local" });
   });
 
   app.use("/api/jugadoras", jugadorasRouter);

@@ -110,6 +110,10 @@ jobs:
           context: ./${{ matrix.componente }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ghcr.io/${{ github.repository }}-${{ matrix.componente }}:sha-${{ github.sha }}
+          # TP7: el commit queda horneado en la imagen (el backend lo devuelve en /api/health).
+          # El Dockerfile del frontend no declara este ARG: lo ignora.
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.componente }}
           cache-to: type=gha,mode=max,scope=${{ matrix.componente }}
 
@@ -123,22 +127,22 @@ jobs:
     permissions:
       contents: read # este job no publica nada: no necesita packages: write
     steps:
-      # El &ref= NO es opcional: un hook pelado despliega la PUNTA de main, no el commit que
-      # este pipeline acaba de verificar. Con dos merges seguidos, la corrida del primero
-      # desplegaría el segundo, que todavía no pasó por nada. Va & y no ? porque la URL del
-      # hook ya trae un parámetro (?key=...).
-      # Ojo: Render RECONSTRUYE ese commit desde el repo; se despliega el commit verificado,
-      # no la imagen verificada. Es la brecha que cierra el TP7.
-      - name: Disparar el deploy en Render (backend + front) del commit verificado
+      # TP7: el hook ya no dice QUÉ COMMIT CONSTRUIR (&ref=) sino QUÉ IMAGEN EJECUTAR (imgURL=).
+      # Los 4 servicios son "Existing Image": Render no compila nada, baja de ghcr.io la imagen
+      # sha-<commit> que publicó el job build de ESTA corrida. Render sólo deja cambiar la
+      # etiqueta (o el digest): si el registry o el nombre no coinciden con la imagen
+      # configurada en el servicio, o la etiqueta no existe, contesta 400 y curl -f corta.
+      - name: Desplegar en QA la IMAGEN del commit (backend + front)
         env:
           HOOK_API: ${{ secrets.RENDER_HOOK_API_QA }}
           HOOK_FRONT: ${{ secrets.RENDER_HOOK_FRONT_QA }}
+          IMG: ghcr.io/${{ github.repository }} # + -backend / -frontend :sha-<commit de esta corrida>
         # Antes de llamar, se revisa cada hook SIN imprimirlo: si está vacío o no tiene la forma
         # de un deploy hook, el job lo dice con nombre y motivo. GitHub enmascara los secrets en
         # el log, así que un valor mal cargado (vacío, con un espacio, otra URL) sólo se ve así.
         run: |
           disparar() {
-            local nombre="$1" hook="$2"
+            local nombre="$1" hook="$2" img="$3"
             if [ -z "$hook" ]; then
               echo "::error::$nombre está vacío (no existe en el environment qa)"; return 1
             fi
@@ -148,14 +152,20 @@ jobs:
             if [[ "$hook" != https://api.render.com/deploy/srv-*\?key=* ]]; then
               echo "::error::$nombre no tiene la forma https://api.render.com/deploy/srv-…?key=… (largo ${#hook})"; return 1
             fi
-            curl -fsS --max-time 30 -o /dev/null "$hook&ref=$GITHUB_SHA"
-            echo "✅ $nombre: deploy pedido a Render para el commit $GITHUB_SHA"
+            # --get --data-urlencode agrega imgURL con '&' (el hook ya trae ?key=…) y codifica
+            # los ':' y '/' de la imagen. La URL del hook va ÚLTIMA: es el único argumento suelto.
+            echo "$nombre → imgURL=$img"
+            curl -fsS --max-time 30 --get --data-urlencode "imgURL=$img" "$hook"
+            echo ""
+            echo "✅ $nombre: Render va a ejecutar $img"
           }
-          disparar RENDER_HOOK_API_QA "$HOOK_API"
-          disparar RENDER_HOOK_FRONT_QA "$HOOK_FRONT"
+          disparar RENDER_HOOK_API_QA "$HOOK_API" "$IMG-backend:sha-$GITHUB_SHA"
+          disparar RENDER_HOOK_FRONT_QA "$HOOK_FRONT" "$IMG-frontend:sha-$GITHUB_SHA"
 
-      # Reintenta 30 x 20 s (~10 min): el hook contesta al instante y Render construye en
-      # segundo plano (2-5 min) + el cold start del free tier. Un curl seco daría rojo falso.
+      # Reintenta 30 x 20 s (~10 min): el hook contesta al instante y Render baja la imagen y la
+      # arranca en segundo plano + el cold start del free tier. Un curl seco daría rojo falso.
+      # El commit lo devuelve la api desde adentro de la imagen (GIT_COMMIT horneado en el build):
+      # si coincide, QA está ejecutando la imagen de ESTA corrida, no la anterior.
       - name: Smoke test (espera a que QA conteste con ESTE commit)
         shell: bash
         env:
@@ -197,16 +207,17 @@ jobs:
     permissions:
       contents: read
     steps:
-      # Acá el &ref= importa más que en QA: entre que la corrida queda esperando y que alguien
-      # aprueba pueden pasar horas, y main se mueve. Con &ref sube a PROD el commit que se
-      # aprobó (el mismo que pasó por QA), no lo último que haya en main.
-      - name: Disparar el deploy en Render (backend + front) del commit aprobado
+      # La MISMA imagen sha-<commit> que se desplegó en QA: no se reconstruye nada. Entre que la
+      # corrida queda esperando y que alguien aprueba pueden pasar horas y main se mueve, pero
+      # el imgURL lleva el commit de ESTA corrida: sube lo que se aprobó, no lo último de main.
+      - name: Desplegar en PROD la MISMA imagen que verificó QA (backend + front)
         env:
           HOOK_API: ${{ secrets.RENDER_HOOK_API_PROD }}
           HOOK_FRONT: ${{ secrets.RENDER_HOOK_FRONT_PROD }}
+          IMG: ghcr.io/${{ github.repository }} # + -backend / -frontend :sha-<commit de esta corrida>
         run: |
           disparar() {
-            local nombre="$1" hook="$2"
+            local nombre="$1" hook="$2" img="$3"
             if [ -z "$hook" ]; then
               echo "::error::$nombre está vacío (no existe en el environment production)"; return 1
             fi
@@ -216,11 +227,15 @@ jobs:
             if [[ "$hook" != https://api.render.com/deploy/srv-*\?key=* ]]; then
               echo "::error::$nombre no tiene la forma https://api.render.com/deploy/srv-…?key=… (largo ${#hook})"; return 1
             fi
-            curl -fsS --max-time 30 -o /dev/null "$hook&ref=$GITHUB_SHA"
-            echo "✅ $nombre: deploy pedido a Render para el commit $GITHUB_SHA"
+            # --get --data-urlencode agrega imgURL con '&' (el hook ya trae ?key=…) y codifica
+            # los ':' y '/' de la imagen. La URL del hook va ÚLTIMA: es el único argumento suelto.
+            echo "$nombre → imgURL=$img"
+            curl -fsS --max-time 30 --get --data-urlencode "imgURL=$img" "$hook"
+            echo ""
+            echo "✅ $nombre: Render va a ejecutar $img"
           }
-          disparar RENDER_HOOK_API_PROD "$HOOK_API"
-          disparar RENDER_HOOK_FRONT_PROD "$HOOK_FRONT"
+          disparar RENDER_HOOK_API_PROD "$HOOK_API" "$IMG-backend:sha-$GITHUB_SHA"
+          disparar RENDER_HOOK_FRONT_PROD "$HOOK_FRONT" "$IMG-frontend:sha-$GITHUB_SHA"
 
       - name: Smoke test (espera a que PROD conteste con ESTE commit)
         shell: bash
