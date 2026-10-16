@@ -31,6 +31,11 @@ FROM mirror.gcr.io/library/node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
+# TP7: el commit del que salió esta imagen. Lo pasa el pipeline (build-args) y la api lo
+# devuelve en /api/health. Va al final de los ENV y en la última etapa, a propósito: así
+# cambiar de commit no invalida la cache de las etapas de arriba (npm ci, build, tests).
+ARG GIT_COMMIT=local
+ENV GIT_COMMIT=$GIT_COMMIT
 
 COPY --from=build --chown=node:node /app/package.json ./
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
