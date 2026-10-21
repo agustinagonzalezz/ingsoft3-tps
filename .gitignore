@@ -20,3 +20,9 @@ reporte-*/
 .DS_Store
 npm-debug.log*
 protection.json
+
+# TP8: Terraform. El estado tiene contraseñas en texto plano: nunca al repo.
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
