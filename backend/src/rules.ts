@@ -112,6 +112,15 @@ export function validarMontoEvento(amount: number): boolean {
 }
 
 /**
+ * El monto más grande que entra en la columna: `amount Decimal(10, 2)` en schema.prisma
+ * (10 dígitos, 2 decimales -> 8 enteros). Con uno más grande la base rechaza el INSERT y la
+ * api contestaba 500. Lo encontró la prueba de integración del TP7, no un unitario: el límite
+ * lo pone la base, y los unitarios no tienen base. Si cambia la columna, cambia este número
+ * (y la integración lo detecta si alguien se olvida).
+ */
+export const MONTO_MAXIMO = 99_999_999.99;
+
+/**
  * Regla 5: eximir a una jugadora de un evento puntual. Devuelve una copia
  * de la lista de participantes con `exempt: true` para ese par evento/jugadora
  * (crea el registro de participación si todavía no existía). Con esto,
@@ -175,6 +184,9 @@ export function validarNuevoEvento(body: unknown): ValidacionEvento {
   }
   if (!validarMontoEvento(amount)) {
     return { ok: false, error: "El monto debe ser mayor a 0" };
+  }
+  if (amount > MONTO_MAXIMO) {
+    return { ok: false, error: "El monto no puede superar $ 99.999.999,99" };
   }
   return { ok: true, datos: { name, type: type as EventType, amount, dueDate: new Date(dueDate) } };
 }

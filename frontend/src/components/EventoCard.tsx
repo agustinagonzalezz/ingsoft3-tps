@@ -33,7 +33,9 @@ export function EventoCard({ evento, onMarcarPago, onDesmarcarPago, onEximir, on
   };
 
   return (
-    <div className="rounded border border-zinc-200 bg-white p-4">
+    // TP7: <article> con el nombre del evento: cada tarjeta es un bloque con nombre propio
+    // (getByRole("article", { name })), y las e2e trabajan adentro de SU evento, no de otro.
+    <article aria-label={name} className="rounded border border-zinc-200 bg-white p-4">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="font-medium">{name}</h2>
@@ -46,7 +48,12 @@ export function EventoCard({ evento, onMarcarPago, onDesmarcarPago, onEximir, on
             {pagaron} pagaron / {faltan} faltan
           </p>
           {puedeEliminar && (
-            <button className="text-xs text-red-600" onClick={() => startTransition(onEliminar)} disabled={isPending}>
+            <button
+              className="text-xs text-red-600"
+              aria-label={`Eliminar evento ${name}`}
+              onClick={() => startTransition(onEliminar)}
+              disabled={isPending}
+            >
               Eliminar evento
             </button>
           )}
@@ -82,6 +89,6 @@ export function EventoCard({ evento, onMarcarPago, onDesmarcarPago, onEximir, on
           <li className="py-1.5 text-zinc-500">No había jugadoras activas al crear este evento.</li>
         )}
       </ul>
-    </div>
+    </article>
   );
 }
