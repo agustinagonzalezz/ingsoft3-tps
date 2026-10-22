@@ -5,6 +5,7 @@ import { jugadorasRouter } from "./routes/jugadoras.js";
 import { eventosRouter } from "./routes/eventos.js";
 import { participacionesRouter } from "./routes/participaciones.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { demoInseguroRouter } from "./routes/demoInseguro.js"; // TP9 §3.3: NO MERGEAR
 
 export function createApp() {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp() {
   app.use("/api/eventos", eventosRouter);
   app.use("/api/participaciones", participacionesRouter);
   app.use("/api/dashboard", dashboardRouter);
+  app.use("/api/demo", demoInseguroRouter); // TP9 §3.3: NO MERGEAR
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Ruta no encontrada" });
