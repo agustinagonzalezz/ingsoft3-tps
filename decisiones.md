@@ -763,3 +763,35 @@ Cierro el TP con **`v7.0.0`** (tag y Release de GitHub), sobre el commit que *De
 En este TP usé Claude (asistente de IA) como guía, siguiendo la guía de la cátedra sección por sección. La IA escribió los cambios de código y de configuración: el `imgURL` en los deploys, el commit horneado en la imagen, las dos suites de Playwright, los jobs `integracion` y `e2e`, los `aria-label` del front, el arreglo del monto máximo y la rotura a propósito del botón. También armó los PRs y me ayudó a redactar este archivo a partir de lo que fuimos haciendo.
 
 Lo hice y verifiqué yo: los `docker pull` sin credenciales, el cambio de fuente de los cuatro servicios en Render y el primer deploy a mano con el hook, cargar jugadoras en QA, correr las dos suites contra mi compose (4 y 3 en verde) y abrir la traza, mergear cada PR, mirar cada corrida, aprobar los deploys a PROD, y bajar los dos reportes de la corrida roja para diagnosticar con la captura y la traza. De cada prueba me pedí poder explicar qué verifica, contra qué entorno corre (la integración contra la api de QA, la e2e contra el front de QA) y qué pasa si falla (la e2e no corre si falla la integración, y PROD no pide aprobación si falla cualquiera de las dos).
+
+## TP8 - Infraestructura como Código
+
+### En una frase
+Escribí un entorno nuevo, **preprod**, en `infra/`: una base en Neon y la api y el front en Render, corriendo la imagen del TP7. No existía hasta que lo creó un `terraform apply`, y desaparece con un `terraform destroy`. Mi QA y mi producción no se tocaron: siguen siendo los que clickeé en el TP6.
+
+### Riel y versiones
+- **Riel canónico:** Terraform contra **Neon** (base) y **Render** (servicios).
+- **Terraform v1.16.6** (instalado con `winget`; la cátedra midió con 1.15.8 y acepta posteriores).
+- **Providers fijados por versión:** `kislerdm/neon` **0.18.0** y `render-oss/render` **1.9.1**. El `.terraform.lock.hcl` está commiteado: fija además el hash de cada uno.
+- **El estado** vive en mi máquina (`infra/terraform.tfstate`), sin bloque `backend`. No está en el repo: tiene la contraseña de la base en texto plano (lo comprobé abriéndolo).
+- **Las credenciales** (`NEON_API_KEY`, `RENDER_API_KEY`, `RENDER_OWNER_ID`) las cargo en la terminal con `Read-Host` y los providers las leen del entorno. No están escritas en ningún archivo.
+
+### Qué se deriva y qué no
+- La **`DATABASE_URL`** de la api se arma en `main.tf` con el rol, la contraseña, el host y la base que devuelve Neon. Nadie la copia (en el TP6 la pegaba a mano en Render).
+- La **`BACKEND_URL`** del front sale de `render_web_service.api.url`, la URL de **su** api.
+- Lo que sigue siendo artesanal en mi cuenta: QA y PROD (los 4 servicios y el proyecto de Neon, creados a mano en el TP6) y los deploy hooks, que el provider de Render no expone.
+
+### Problemas encontrados y cómo los resolví
+- **El primer `apply` falló con `org_id is required`.** Neon ahora agrupa los proyectos en organizaciones y su API exige decir en cuál crearlo; la guía no lo menciona. Le agregué `org_id` al `neon_project`, como variable con mi organización por defecto (no es un secreto). El apply fallido no creó nada, pero igual dejó el output `database` guardado en el estado: el estado se escribe aunque el apply falle.
+- **Preprod no volvió idéntico la primera vez.** En el primer `destroy` → `apply`, la base renació en **Ohio** (`us-east-2`) cuando antes estaba en **Oregon** (`us-west-2`), como Render. No había declarado la región, así que Neon eligió una por defecto, y no siempre la misma. Aprendí que Terraform garantiza lo que está escrito, no lo que dejo que el proveedor decida. Le agregué `region_id = "aws-us-west-2"`.
+- **El plan de ese arreglo no lo apliqué.** Decía `region_id ... # forces replacement` (la región de una base no se cambia en caliente: se destruye y se crea), arrastraba al rol y a la base, y proponía un `update in-place` de la api por el cambio de `DATABASE_URL`, que es justo el update que Render rechaza en el plan gratuito. Aplicarlo habría dejado preprod a medias. Hice `destroy` y `apply`, y después repetí el ciclo para comprobar que la base vuelve a Oregon.
+- **El `.gitignore` de la guía** tiene un comentario al final de la línea (`*.tfvars        # ahí van los valores locales`). En `.gitignore` eso no es un comentario sino parte del patrón, y los `.tfvars` no quedarían ignorados. Puse cada comentario en su propia línea y lo commiteé antes del primer apply.
+- **`terraform` no se reconocía después de instalarlo**: la terminal de VS Code seguía con el PATH viejo. Lo recargué en la misma terminal (o se resuelve cerrando VS Code entero).
+
+### Lo que medí que la guía dejaba como «no medido»
+- Al recrear los servicios de Render con el mismo nombre, **volvieron las mismas URLs**, sin sufijo (`teampay-api-preprod.onrender.com`). Igual las leo siempre del `terraform output`.
+
+### Declaración de uso de IA
+Usé Claude (asistente de IA) como guía, siguiendo la guía de la cátedra sección por sección. La IA escribió el HCL de `infra/` (`main.tf`, `variables.tf`, `outputs.tf`), las líneas del `.gitignore` y este archivo a partir de lo que fuimos haciendo, y me ayudó a diagnosticar el error de `org_id` y el cambio de región.
+
+Lo hice y verifiqué yo: crear las API keys de Neon y Render, correr cada `init`, `plan`, `apply` y `destroy` desde mi terminal, leer cada plan antes de confirmarlo (incluido el que decidí no aplicar), comprobar la idempotencia («No changes» en la segunda pasada), encontrar la contraseña dentro del estado, provocar el drift borrando la base desde la consola de Neon y verlo repararse, crear una base que Terraform no declara y ver que el plan no la detecta, probar que el `prevent_destroy` frena el `destroy`, y comprobar preprod como entorno: `/api/health` con el commit de la imagen del TP7, `/api/jugadoras` contra su base y el front cargando contra su api. En cada `destroy` miré en las consolas que QA y PROD siguieran intactos.
