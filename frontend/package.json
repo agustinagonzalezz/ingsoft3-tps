@@ -11,6 +11,7 @@
     "test:ci": "vitest run --coverage --coverage.reportsDirectory=${COVERAGE_DIR:-coverage}"
   },
   "dependencies": {
+    "@sentry/react": "11.8.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^7.18.4"

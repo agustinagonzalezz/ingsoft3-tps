@@ -51,4 +51,5 @@ USER node
 EXPOSE 8080
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "dist/index.js"]
+# TP9: --import carga Sentry antes que la app (ver src/instrument.ts).
+CMD ["node", "--import", "./dist/instrument.js", "dist/index.js"]

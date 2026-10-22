@@ -17,6 +17,7 @@ export default defineConfig({
         "src/**/*.test.ts", // los tests no se miden a sí mismos
         "src/generated/**", // cliente generado por `prisma generate`
         "src/index.ts", // arranque: lee PORT y llama a listen()
+        "src/instrument.ts", // TP9: configura Sentry (sólo lee el entorno); se prueba en PROD
         "src/db.ts", // arma el PrismaClient con la URL del entorno
         // Recién después de sacar su lógica a rules.ts / mappers.ts / services/:
         "src/app.ts", // cablea Express: routers, JSON y el manejador de errores
