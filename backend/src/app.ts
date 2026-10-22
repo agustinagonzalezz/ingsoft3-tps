@@ -38,10 +38,8 @@ export function createApp() {
   });
 
   // TP9: Sentry recibe los errores ANTES que mi handler (que es el que contesta el 500).
-  // El P2025 (registro no encontrado) no lo mando: es un 404 esperado, no una falla.
-  Sentry.setupExpressErrorHandler(app, {
-    shouldHandleError: (err) => (err as { code?: string })?.code !== "P2025",
-  });
+  // (El P2025, un 404 esperado, se descarta en instrument.ts.)
+  Sentry.setupExpressErrorHandler(app);
 
   // Express 5 propaga solo los errores de handlers async: caen acá.
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {

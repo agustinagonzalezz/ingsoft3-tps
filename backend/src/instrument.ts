@@ -15,4 +15,9 @@ Sentry.init({
   release: process.env.GIT_COMMIT,
   // Medir el 100 % de los pedidos: la app tiene poco tráfico y el plan gratis sobra.
   tracesSampleRate: 1.0,
+  // El P2025 de Prisma (registro no encontrado) es un 404 esperado, no una falla: no lo mando.
+  beforeSend(event, hint) {
+    const err = hint.originalException as { code?: string } | undefined;
+    return err?.code === "P2025" ? null : event;
+  },
 });
