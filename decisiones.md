@@ -795,3 +795,61 @@ Escribí un entorno nuevo, **preprod**, en `infra/`: una base en Neon y la api y
 Usé Claude (asistente de IA) como guía, siguiendo la guía de la cátedra sección por sección. La IA escribió el HCL de `infra/` (`main.tf`, `variables.tf`, `outputs.tf`), las líneas del `.gitignore` y este archivo a partir de lo que fuimos haciendo, y me ayudó a diagnosticar el error de `org_id` y el cambio de región.
 
 Lo hice y verifiqué yo: crear las API keys de Neon y Render, correr cada `init`, `plan`, `apply` y `destroy` desde mi terminal, leer cada plan antes de confirmarlo (incluido el que decidí no aplicar), comprobar la idempotencia («No changes» en la segunda pasada), encontrar la contraseña dentro del estado, provocar el drift borrando la base desde la consola de Neon y verlo repararse, crear una base que Terraform no declara y ver que el plan no la detecta, probar que el `prevent_destroy` frena el `destroy`, y comprobar preprod como entorno: `/api/health` con el commit de la imagen del TP7, `/api/jugadoras` contra su base y el front cargando contra su api. En cada `destroy` miré en las consolas que QA y PROD siguieran intactos.
+
+## TP9 - DevSecOps + Observabilidad
+
+### En una frase
+Prendí las tres protecciones automáticas de GitHub (Dependabot, CodeQL y push protection), puse un monitor externo que me avisa si producción se cae, y agregué Sentry al back y al front para ver qué falla, qué tarda y qué se usa en producción.
+
+### El PR de Dependabot que mergeé
+- Mergeé el **[#59](https://github.com/agustinagonzalezz/ingsoft3-tps/pull/59)**: **vite de 8.3.2 a 8.3.5** en el front.
+- **Por qué me animé:**
+  - Es un **patch** (cambia el último número), y el changelog sólo traía *Bug Fixes*, sin *breaking changes*.
+  - Es una dependencia de **desarrollo**: arma el front, pero no viaja al navegador ni a producción (en producción el front lo sirve nginx).
+  - Mi CI lo probó en el mismo PR: `build (frontend)` construye la imagen (que corre `vite build`) y corre los tests con cobertura, y estaba en verde. Después del merge pasó por QA, integración y e2e antes de que yo aprobara PROD.
+- **No era una actualización cualquiera:** lo abrió una *security update*, porque esa versión de vite tenía **6 alertas** (una **alta**, de `launch-editor`, en Windows). Todas eran del **servidor de desarrollo** de vite: el riesgo estaba en mi máquina mientras programo, no en producción.
+- **Los otros PRs los dejé abiertos a propósito:** `react` venía sin `react-dom` (tienen que ir en la misma versión), `prisma` y `@prisma/adapter-pg` venían en PRs separados (también tienen que ir juntos), y `typescript` y las actions eran saltos **major**. Que estén en verde no alcanza: en un PR sólo corren el build y los tests unitarios.
+
+### El monitor y lo que vi en Sentry
+- **Monitor:** UptimeRobot contra `https://teampay-api-prod.onrender.com/api/health`, cada 5 minutos. Antes comprobé que el endpoint contesta **200 a un pedido HEAD** (el plan gratis pregunta con HEAD), y Express lo contesta sin tocar nada.
+- **La caída provocada:** suspendí la api de PROD en Render a las **16:02** y el mail de **DOWN** llegó a las **16:03**. La reanudé a las **16:04** y el **UP** llegó a las **16:04**. El monitor registró **1 incidente, 2 min 20 s caída**. Me enteré en **1 minuto**; en el peor caso son 5 (lo que tarda en volver a preguntar). Sin monitor me habría enterado cuando alguien se quejara, como los 40 minutos del escenario.
+- Al terminar **pausé el monitor**: un pedido cada 5 minutos no deja dormir a la api y se come casi todas las 750 horas gratis que comparten mis servicios de Render.
+- **En Sentry**, después de usar la app de producción unos minutos:
+  - **El error:** *Error: Falla de prueba del TP9*, de `GET /api/falla`, con el archivo, la línea, el entorno (`teampay-api-prod`) y el commit (`ba1ddc3`).
+  - **Mi operación más usada:** `GET /api/eventos` (la lista de eventos).
+  - **Mi operación más lenta:** `GET /api/dashboard`, con **P95 de 2,30 s**, cuatro veces más que la siguiente. Trae las cuatro tablas enteras para calcular los totales, y además fue el primer pedido después de que la base de Neon se durmió.
+- Con ese dato abrí la tarjeta **[#64](https://github.com/agustinagonzalezz/ingsoft3-tps/issues/64)** en mi tablero: calcular los totales en la base en lugar de traer todas las filas, y volver a medir.
+
+### Qué mira cada pieza y qué no
+| Pieza | Qué mira | Qué NO mira | Qué cubre ese hueco |
+|---|---|---|---|
+| Push protection | Credenciales con formato conocido (tokens de GitHub, AWS…) | Un password inventado o un formato que no conoce | El `.gitignore` y los secretos por entorno (TP2, TP4, TP6) |
+| Dependabot | Versiones con vulnerabilidades publicadas | Si es explotable en **mi** app, o fallas que todavía no se publicaron | Leer la alerta y decidir yo; mis tests para mergear con confianza |
+| CodeQL | Patrones peligrosos en mi código, sin ejecutarlo | Todo lo que no sigue un patrón conocido (en mi demo se le pasó un path traversal) | La revisión del PR |
+| Monitor | Si `/health` contesta | Si la app anda **bien** | Sentry |
+| Sentry | Errores, tiempos y uso desde adentro de la app | Si la app está caída (si no corre, no manda nada) | El monitor externo |
+
+### Práctica (no se entrega)
+- **El secreto bloqueado:** intenté pushear un PAT real sin scopes y GitHub rechazó el push con `GH013: Push cannot contain secrets`, indicando el tipo de secreto, el commit y la línea. La rama nunca llegó al repo; la borré y revoqué el token.
+- **CodeQL:** en el **[#62](https://github.com/agustinagonzalezz/ingsoft3-tps/pull/62)** metí código inseguro a propósito y lo cerré sin mergear. Detectó un **XSS reflejado** (OWASP A05, *Injection*: el nombre que manda el usuario va al HTML sin escapar) y **falta de rate limiting** (OWASP A06, *Insecure Design*: alguien puede saturar la ruta). El problema más grave de esa ruta, el **path traversal** (leer cualquier archivo del servidor), **no** lo detectó. El análisis de mi código real dio 0 alertas.
+- Mientras tanto, `build (backend)` estaba **en verde**: mis tests prueban que el código hace lo que espero; CodeQL busca lo que el código **permite**.
+
+### Problemas encontrados y cómo los resolví
+- **El build del back se puso rojo con Sentry.** En la versión 11, `setupExpressErrorHandler` ya no acepta opciones, y yo le pasaba un filtro para no mandar el 404 de Prisma (P2025). Lo pasé a `beforeSend` en `instrument.ts`. Mi CI lo frenó en el PR, antes de llegar a QA.
+- **No me aparecía la aprobación de PROD.** Quedaba esperando una corrida vieja (la del merge del `dependabot.yml`), y el `concurrency: deploy-prod` no deja pasar otra hasta que se resuelve. La rechacé (aprobarla habría hecho retroceder PROD) y ahí apareció la de Sentry.
+- **PROD volvió a una imagen vieja.** Para que la api leyera una variable nueva usé *Manual Deploy → Deploy latest reference* en Render. Ese botón no usa la última imagen del pipeline, sino la imagen por defecto que configuré a mano en el TP7: `/api/health` empezó a devolver `"commit":"local"`. Lo arreglé volviendo a correr el job `deploy (production)` de la corrida que ya había aprobado (su smoke test espera hasta ver el commit correcto), y cambié la imagen por defecto del servicio por la de ese commit. Aprendí que en PROD sólo se despliega por el pipeline.
+- **Sentry no recibía nada aunque todo estaba en verde.** En `SENTRY_DSN` había pegado la dirección **OTLP** del proyecto y no el **DSN**. Con un DSN inválido Sentry se apaga sin avisar y la app anda igual. Lo verifiqué viendo llegar el error, no mirando el deploy.
+- **Dependabot dejó de abrir PRs** (*cannot open any more pull requests*): tiene un límite de 5 abiertos por carpeta. Cerré el de vite 8.3.4, que el 8.3.5 dejó obsoleto.
+
+### Enlaces del TP9
+- `dependabot.yml`: [#44](https://github.com/agustinagonzalezz/ingsoft3-tps/pull/44)
+- PR de Dependabot mergeado: [#59](https://github.com/agustinagonzalezz/ingsoft3-tps/pull/59)
+- Demo de CodeQL (cerrada sin mergear): [#62](https://github.com/agustinagonzalezz/ingsoft3-tps/pull/62)
+- Sentry en back y front: [#63](https://github.com/agustinagonzalezz/ingsoft3-tps/pull/63)
+- Tarjeta nacida de Sentry: [#64](https://github.com/agustinagonzalezz/ingsoft3-tps/issues/64)
+- Seguridad: [Security](https://github.com/agustinagonzalezz/ingsoft3-tps/security)
+
+### Declaración de uso de IA
+Usé Claude (asistente de IA) como guía, siguiendo la guía de la cátedra sección por sección. La IA escribió el `dependabot.yml`, el código de Sentry en el back y en el front (y su arreglo para la versión 11), el código inseguro de la demo de CodeQL y este archivo a partir de lo que fuimos haciendo. También me ayudó a elegir qué PR de Dependabot mergear y a diagnosticar por qué no llegaban los datos a Sentry.
+
+Lo hice y verifiqué yo: prender las alertas y las actualizaciones de seguridad de Dependabot y CodeQL en *Settings*, leer el changelog y el CI del #59 antes de mergearlo, generar el PAT, ver el push rechazado y revocarlo, leer los hallazgos de CodeQL en el PR, crear el monitor, comprobar que `/api/health` contesta HEAD, suspender y reanudar PROD y medir los avisos, crear los proyectos de Sentry, cargar el DSN del back en Render, aprobar cada deploy a PROD, usar la app y romperla con `/api/falla`, leer las tres cosas en Sentry y abrir la tarjeta en el tablero. Al terminar saqué `/api/falla`.
