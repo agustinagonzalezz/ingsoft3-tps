@@ -27,12 +27,6 @@ export function createApp() {
   app.use("/api/participaciones", participacionesRouter);
   app.use("/api/dashboard", dashboardRouter);
 
-  // ⚠️ TEMPORAL (TP9 §3.5): un endpoint que falla a propósito, para ver un error llegar a Sentry.
-  // Se saca cuando termina el práctico.
-  app.get("/api/falla", () => {
-    throw new Error("Falla de prueba del TP9");
-  });
-
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Ruta no encontrada" });
   });
