@@ -87,7 +87,7 @@ jobs:
 
       - name: Publicar el reporte (${{ matrix.componente }})
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.componente }} # un nombre por componente: en la matriz no se pueden repetir
           path: reportes/coverage
@@ -224,7 +224,7 @@ jobs:
         working-directory: ./frontend
 
       - name: Publicar reporte de integración
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }} # el reporte importa MÁS cuando falla
         with:
           name: playwright-report-integracion # distinto del de e2e: dos iguales rompen la corrida
@@ -261,7 +261,7 @@ jobs:
         working-directory: ./frontend
 
       - name: Publicar reporte e2e
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-e2e
